@@ -1,11 +1,14 @@
 #pragma once
 #include <Logger.h>
 
-// targets
 namespace MessirLogger {
 
 	class StandardOutputTarget : public Target {
-	public:
-		void Write_log(const LogRecord& record) override;
+
+	protected:
+		void Setup() override;
+		void Maintenance() override;
+		void Refresh() override;
+		TargetResult Try_write_log(const LogRecord& record) override;
 	};
 }

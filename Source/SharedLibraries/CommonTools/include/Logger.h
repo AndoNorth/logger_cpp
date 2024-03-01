@@ -1,13 +1,16 @@
 #pragma once
 #include <string>
+//#include <iostream> // TODO@CONSIDER: for std::stringstream?
+//#include <sstream> // TODO@CONSIDER: for std::stringstream?
 //#include <memory> // TODO@CONSIDER: included in other include? - need for smart pointers.
 #include <set>
 #include <vector>
 
 //#include <SerializerJSON.h>
-//#include <format> // TODO@CONSIDER: can we use this Format_log_message()
-#include <chrono> // TODO@CONSIDER: without this library, get compile errors for unique_lock,recursive_mutex, jthread
-//#include <iomanip> // TODO@CONSIDER: included in other include? - is an io library?
+#include <format> // TODO@CONSIDER: this causes a build error in pipeline? can be ignored, problem with C++ standard not supported
+#include <chrono> // TODO@CONSIDER: without this library, get compile errors for unique_lock, recursive_mutex, jthread
+//#include <iomanip> // TODO@CONSIDER: is this included in another include? - is an io library?
+#include <source_location> // TODO@CONSIDER use this to replace the call to __FILE__ and __LINE__
 
 #include <semaphore>
 
@@ -15,11 +18,28 @@
 #include <configure.h>
 #include <afxver_.h>
 #ifndef _WINDOWS
-#define COMMOBJECTS_EXPORT
+#define COMMONTOOLS_EXPORT
 #endif
 
-// data structures
+/**
+ * macros for logging, example usage:
+ * MSS_DEBUG(LOG_TECHNICAL, "surpervision") << "This is my log message";
+ */
+#define MSS_DEBUG(kind, entity) log_line(MessirLogger::LogLevel::LEVEL_DEBUG, \
+	kind, source_location::current(), entity, __logger)
+#define MSS_INFO(kind, entity) log_line(MessirLogger::LogLevel::LEVEL_INFO, \
+	kind, source_location::current(), entity, __logger)
+#define MSS_WARN(kind, entity) log_line(MessirLogger::LogLevel::LEVEL_WARNING, \
+	kind, source_location::current(), entity, __logger)
+#define MSS_ERROR(kind, entity) log_line(MessirLogger::LogLevel::LEVEL_ERROR, \
+	kind, source_location::current(), entity, __logger)
+#define MSS_CRITICAL(kind, entity) log_line(MessirLogger::LogLevel::LEVEL_CRITICAL, \
+	kind, source_location::current(), entity, __logger)
+#define MSS_FATAL(kind, entity) log_line(MessirLogger::LogLevel::LEVEL_FATAL, \
+	kind, source_location::current(), entity, __logger)
+
 namespace MessirLogger {
+	// data structures
 	/**
 	 * Represents the log level, used for filtering log records
 	 * based on severity, uses an order comparison.
@@ -29,7 +49,7 @@ namespace MessirLogger {
 		LEVEL_INFO, /**< default level */
 		LEVEL_WARNING, /**< */
 		LEVEL_ERROR, /**< */
-		LEVEL_CRTIICAL, /**< */
+		LEVEL_CRITICAL, /**< */
 		LEVEL_FATAL, /**< used for system crashes */
 		LOG_LEVEL_COUNT, /**< used to track number of log levels */
 	};
@@ -65,18 +85,22 @@ namespace MessirLogger {
 	struct LogRecord {
 		LogLevel log_level = LogLevel::LEVEL_INFO;
 		LogKind log_kind = LogKind::KIND_ALL;
-		std::string source;
+		// TODO@CONSIDER: how do we serialize source_location?
+		std::source_location source;
 		std::string source_entity;
 		std::string log_message;
+		std::chrono::time_point<std::chrono::utc_clock> log_time;
 	};
+
+	COMMONTOOLS_EXPORT bool operator==(const LogRecord& lhs, const LogRecord& rhs);
 
 	/**
 	 * Represents the target type, used to create objects of targets.
 	 */
 	enum TargetType {
-		SYSTEM_OUT_LOG, /**< target writes to std::cout */
-		SYSTEM_ERR_LOG, /**< target writes to std::cerr */
-		FILE_LOG, /**< target writes to file on local system */
+		SYSTEM_OUT_TARGET, /**< target writes to std::cout */
+		SYSTEM_ERR_TARGET, /**< target writes to std::cerr */
+		FILE_TARGET, /**< target writes to file on local system */
 		LOG_TARGET_COUNT, /**< used to track number of log target types */
 	};
 
@@ -90,66 +114,83 @@ namespace MessirLogger {
 		LogKind log_kind;
 		std::set<std::string> targets;
 	};
-}
 
-// config
-namespace MessirLogger {
+	COMMONTOOLS_EXPORT bool operator==(const DispatchEntry& lhs, const DispatchEntry& rhs);
 
-	class COMMOBJECTS_EXPORT TargetConfig {
-	private:
+	/**
+	 * Represents the result of a write log attempt, used for debugging.
+	 */
+	struct TargetResult {
+		bool success;
+		std::string reason;
+	};
+
+	// config
+	//TODO@CONSIDER: can these be JSONSerializable?
+	class COMMONTOOLS_EXPORT TargetConfig {
+
 	public:
-		std::string m_target_name;
-		std::string m_format_string;
-		TargetType m_target_type;
+		std::string _target_name;
+		std::string _format_string;
+		TargetType _target_type;
+
 	public:
 		TargetConfig(const std::string& name, const std::string& format, TargetType type);
 		~TargetConfig();
 	};
 
-	class COMMOBJECTS_EXPORT LoggerConfig /* : public JSONSerializable */ {
-	private:
+	COMMONTOOLS_EXPORT bool operator==(const TargetConfig& lhs, const TargetConfig& rhs);
+
+	class COMMONTOOLS_EXPORT LoggerConfig {
+
 	public:
 		// TODO@CONSIDER: we use pointer to have polymorphic behaviour, but this means we can't serialize this object?
-		std::vector<std::shared_ptr<TargetConfig>> m_target_configs;
-		std::vector<DispatchEntry> m_dispatch_config;
-		bool m_asynchronous_mode = true;
-
-	public:
-		//virtual void Serialize(JSONSerializer& serializer) override;
-		//virtual void Deserialize(JSONSerializer& serializer) override;
-
-		auto GetExposedMembers() {
-			//return
-			//	members(
-			//		member("file_name", &DocumentConfig::file_name, this),
-			//		member("file_name", &DocumentConfig::file_name, this)
-			//		);
-		}
-
+		std::vector<std::shared_ptr<TargetConfig>> _target_configs;
+		std::vector<DispatchEntry> _dispatch_config;
+		bool _use_fallback = true;
+		bool _asynchronous_mode = true;
 	};
-}
 
-// targets
-namespace MessirLogger {
+	COMMONTOOLS_EXPORT bool operator==(const LoggerConfig& lhs, const LoggerConfig& rhs);
 
-	class Target {
+	// target
+	class COMMONTOOLS_EXPORT Target {
+
 	protected:
-		std::string m_target_name;
-		std::string m_format_string = "%%time [%%source] [%%level:%%kind] - %%log";
-		std::string m_time_format = "%b %d %H:%M:%S";
-		bool m_active;
+		std::string _target_name;
+		std::string _format_string =
+			"%%monstr %%day %%hour:%%min:%%decsec [%%source] [%%level:%%kind] [%%entity] - %%log";
+		TargetType _target_type;
+
 	protected:
+		virtual void Setup() = 0;
+		virtual void Maintenance() = 0;
+		virtual void Refresh() = 0;
+		virtual TargetResult Try_write_log(const LogRecord& record) = 0;
+		virtual void Load_config(const TargetConfig& config);
+		virtual std::shared_ptr<TargetConfig> Export_config();
 		std::string Format_log_message(const LogRecord& record);
+		/**
+		 * Wrapper for time formatting.
+		 *
+		 * @param input_str unformatted input
+		 * @param time utc time used as reference for formatter
+		 *
+		 * @return formatted_str formatted output
+		 */
+		std::string Format_time(const std::string& input_str,
+			const std::chrono::time_point<std::chrono::utc_clock>& time);
+
 	public:
 		std::string Get_target_name() const;
-
-		virtual void Init();
-		virtual void Load_config(const TargetConfig& config);
+		std::shared_ptr<TargetConfig> Get_config();
+		void Configure(const TargetConfig& config);
+		void Initialize();
 		/**
-		 * Periodically run method, requires implementation in derived classes.
+		 * Periodically run method
 		 */
-		virtual void Maintenance();
-		virtual void Write_log(const LogRecord& record) = 0;
+		void Perform_maintenance();
+		TargetResult Write_log(const LogRecord& record);
 	};
 
 	/**
@@ -159,31 +200,51 @@ namespace MessirLogger {
 	 * 
 	 * @return target smart pointer to Target of TargetType
 	 */
-	std::shared_ptr<Target> New_log_target(TargetType target_type);
-}
+	COMMONTOOLS_EXPORT std::shared_ptr<Target> New_log_target(TargetType target_type);
+	TargetType Get_target_type(const std::shared_ptr<Target>& target);
 
-// logger
-namespace MessirLogger {
-
+	// logger
+	/**
+	 * Represents a key-value pair, where key is [log_level, log_kind]
+	 * and value is [targets], generated from dispatch key.
+	 */
 	struct DispatchKey {
 		LogLevel log_level;
 		LogKind log_kind;
 		std::set<std::shared_ptr<Target>> targets;
 	};
 
-	class COMMOBJECTS_EXPORT Logger {
+	class COMMONTOOLS_EXPORT Logger {
+
 	private:
-		std::jthread m_logging_thread;
-		std::binary_semaphore m_logging_smph {0};
+		std::shared_ptr<Target> _fallback_target;
+		bool _use_fallback = true;
 
-		std::jthread m_maintenance_thread;
+		std::jthread _logging_thread;
+		std::binary_semaphore _logging_smph {0};
+		bool _asynchronous_mode = true;
 
-		std::vector<std::shared_ptr<Target>> m_targets;
-		std::vector<DispatchKey> m_dispatch_keys;
-		bool m_asynchronous_mode = true;
+		std::jthread _maintenance_thread;
 
-		std::vector<LogRecord> m_log_records;
-		std::recursive_mutex	m_log_records_mutex;
+		std::vector<std::shared_ptr<Target>> _targets;
+		std::vector<DispatchKey> _dispatch_keys;
+
+		std::vector<LogRecord> _log_records;
+		std::recursive_mutex	_log_records_mutex;
+
+	private:
+		void Maintain_targets();
+		/**
+		 * Dispatch log record and write to appropriate targets.
+		 *
+		 * @param record
+		 */
+		void Write_log(const LogRecord& record);
+		/**
+		 * Handle for asynchronous logging, to be used by a thread.
+		 *
+		 */
+		void Handle_logs();
 
 	public:
 		~Logger();
@@ -196,29 +257,20 @@ namespace MessirLogger {
 		void Start_logger_maintainer();
 		void Stop_logger_maintainer();
 
-		void Maintain_targets();
+		LoggerConfig Get_config();
 
 		/**
 		 * Load the logger configuration.
 		 * 
 		 * @param config input configuration
 		 */
-		void Load_config(const LoggerConfig& config);
+		void Configure(const LoggerConfig& config);
 
-		/**
-		 * Dispatch log record and write to appropriate targets.
-		 * 
-		 * @param record
-		 */
-		void Write_log(const LogRecord& record);
+		void Initialize();
 
-		/**
-		 * API for logging.
-		 * 
-		 * @param record log record with LogLevel, LogKind, source, source_entity and log message
-		 */
+		void Add_target(std::shared_ptr<Target> target);
+
 		void Log_entry(LogRecord record);
-
 		/**
 		 * API for logging.
 		 * 
@@ -229,14 +281,43 @@ namespace MessirLogger {
 		 * @param source_entity default value of ""
 		 */
 		void Log_entry(LogLevel log_level, LogKind log_kind,
-			std::string log_message, 
-			std::string source = __FILE__ ":" + std::to_string(__LINE__),
+			std::string log_message,
+			std::source_location source,
 			std::string source_entity = "");
-
-		/**
-		 * Handle for asynchronous logging, to be used by a thread.
-		 *
-		 */
-		void Handle_logs();
 	};
 }
+
+/**
+ * singleton of __logger to be referenced by other modules.
+ */
+extern COMMONTOOLS_EXPORT MessirLogger::Logger __logger;
+
+/**
+ * this is required to solve a LINK error,
+ * we cannot direclty use COMMONTOOLS_EXPORT for std::stringstream.
+ */
+class log_line_linking_stub : public std::stringstream {};
+
+/**
+ * wrapper for convenient logging.
+ */
+class COMMONTOOLS_EXPORT log_line : public log_line_linking_stub {
+
+public:
+	MessirLogger::LogLevel _level;
+	MessirLogger::LogKind _kind;
+	std::string _entity;
+	std::source_location _source;
+	MessirLogger::Logger& _logger;
+
+public:
+	log_line(MessirLogger::LogLevel level, MessirLogger::LogKind kind,
+		std::source_location source, std::string entity, MessirLogger::Logger& logger)
+		: _level(level), _kind(kind), _source(source),
+		_entity(entity), _logger(logger)
+	{}
+
+	~log_line() {
+		_logger.Log_entry(_level, _kind, this->str(), _source, _entity);
+	}
+};
