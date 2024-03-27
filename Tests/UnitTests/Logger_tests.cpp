@@ -1,3 +1,6 @@
+#include "stdafx.h"
+
+#undef trace
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
@@ -46,6 +49,11 @@ TEST_F(Configuration_tests, All_config_test) {
 	ASSERT_TRUE(test_config == logger.Get_config());
 }
 
+TEST_F(Configuration_tests, Reconfigure_test) {
+	logger.Reconfigure(test_config);
+	ASSERT_TRUE(test_config == logger.Get_config());
+}
+
 /**
  * class created for validating targets generic API.
  */
@@ -61,17 +69,19 @@ protected:
 		_log_records.emplace_back(record);
 		return result;
 	}
-	void Setup() { return; }
-	void Maintenance() {
-		_maintenence_called = true;
-	}
-	void Refresh() { return; }
+	void Setup() { }
+	void Maintenance() {	_maintenence_called = true; }
+	void Refresh() { }
 
 public:
 	bool Contains_log_record(const MessirLogger::LogRecord& record) const {
 		return std::find(_log_records.begin(), _log_records.end(), record) != _log_records.end();
 	}
 	bool Get_maintenance_called() const { return _maintenence_called; }
+	std::string Return_formatted_time(const std::string& input_str,
+		const std::chrono::time_point<std::chrono::system_clock>& time) {
+		return this->Target::Format_time(input_str, time);
+	}
 };
 
 /**
@@ -103,6 +113,261 @@ bool Check_maintenance_called(const MessirLogger::Target& target) {
 		static_cast<const TestTarget&>(target);
 
 	return test_target.Get_maintenance_called();
+}
+
+/**
+ * Formatter_tests are to test the custom formatter in targets, max year tested = 2035.
+ * useful debug logs: 
+ *   std::cout << "expected=\"" << expected_str << "\",formatted=\"" << formatted_str << "\"" << std::endl;
+ * test results validated using:
+ *   https://www.timeanddate.com/
+ */
+TEST(Formatter_tests, Time_formatter_time_test_00) {
+	std::string expected_str = "00,00,00,000";
+	TestTarget target;
+	std::string format_str = "%%hour,%%min,%%sec,%%ms";
+	std::chrono::time_point<std::chrono::system_clock> time;
+	time = MessirLogger::Convert_system_clock_to_UTC(time);
+	std::string formatted_str = target.Return_formatted_time(format_str, time);
+	bool match = expected_str == formatted_str;
+	ASSERT_TRUE(match);
+}
+
+TEST(Formatter_tests, Time_formatter_time_test_01) {
+	std::string expected_str = "06,07,08,009";
+	TestTarget target;
+	std::string format_str = "%%hour,%%min,%%sec,%%ms";
+	std::chrono::time_point<std::chrono::system_clock> time =
+		std::chrono::time_point<std::chrono::system_clock>(
+			std::chrono::hours(6) + std::chrono::minutes(7) +
+			std::chrono::seconds(8) + std::chrono::milliseconds(9));
+	time = MessirLogger::Convert_system_clock_to_UTC(time);
+	std::string formatted_str = target.Return_formatted_time(format_str, time);
+	bool match = expected_str == formatted_str;
+	ASSERT_TRUE(match);
+}
+
+TEST(Formatter_tests, Time_formatter_time_test_02) {
+	std::string expected_str = "13,14,15,016";
+	TestTarget target;
+	std::string format_str = "%%hour,%%min,%%sec,%%ms";
+	std::chrono::time_point<std::chrono::system_clock> time =
+		std::chrono::time_point<std::chrono::system_clock>(
+			std::chrono::hours(13) + std::chrono::minutes(14) +
+			std::chrono::seconds(15) + std::chrono::milliseconds(16));
+	time = MessirLogger::Convert_system_clock_to_UTC(time);
+	std::string formatted_str = target.Return_formatted_time(format_str, time);
+	bool match = expected_str == formatted_str;
+	ASSERT_TRUE(match);
+}
+
+TEST(Formatter_tests, Time_formatter_time_test_03) {
+	std::string expected_str = "01,02,03,004";
+	TestTarget target;
+	std::string format_str = "%%hour,%%min,%%sec,%%ms";
+	std::chrono::time_point<std::chrono::system_clock> time =
+		std::chrono::time_point<std::chrono::system_clock>(
+			std::chrono::hours(24) + std::chrono::minutes(61) +
+			std::chrono::seconds(62) + std::chrono::milliseconds(1004));
+	time = MessirLogger::Convert_system_clock_to_UTC(time);
+	std::string formatted_str = target.Return_formatted_time(format_str, time);
+	bool match = expected_str == formatted_str;
+	ASSERT_TRUE(match);
+}
+
+TEST(Formatter_tests, Time_formatter_date_test_00) {
+	std::string expected_str = "1970,70,01,Jan,01";
+	TestTarget target;
+	std::string format_str = "%%year,%%yr,%%month,%%monstr,%%day";
+	std::chrono::time_point<std::chrono::system_clock> time;
+	time = MessirLogger::Convert_system_clock_to_UTC(time);
+	std::string formatted_str = target.Return_formatted_time(format_str, time);
+	bool match = expected_str == formatted_str;
+	ASSERT_TRUE(match);
+}
+
+TEST(Formatter_tests, Time_formatter_date_test_01) {
+	std::string expected_str = "1989,89,01,Jan,18";
+	TestTarget target;
+	std::string format_str = "%%year,%%yr,%%month,%%monstr,%%day";
+	std::chrono::time_point<std::chrono::system_clock> time =
+		std::chrono::time_point<std::chrono::system_clock>(std::chrono::days(6957));
+	std::string formatted_str = target.Return_formatted_time(format_str, time);
+	bool match = expected_str == formatted_str;
+	ASSERT_TRUE(match);
+}
+
+TEST(Formatter_tests, Time_formatter_date_test_02) {
+	std::string expected_str = "2023,23,02,Feb,03";
+	TestTarget target;
+	std::string format_str = "%%year,%%yr,%%month,%%monstr,%%day";
+	std::chrono::time_point<std::chrono::system_clock> time =
+		std::chrono::time_point<std::chrono::system_clock>(std::chrono::days(19391));
+	time = MessirLogger::Convert_system_clock_to_UTC(time);
+	std::string formatted_str = target.Return_formatted_time(format_str, time);
+	bool match = expected_str == formatted_str;
+	ASSERT_TRUE(match);
+}
+
+TEST(Formatter_tests, Time_formatter_date_test_03) {
+	std::string expected_str = "2016,16,03,Mar,01";
+	TestTarget target;
+	std::string format_str = "%%year,%%yr,%%month,%%monstr,%%day";
+	std::chrono::time_point<std::chrono::system_clock> time =
+		std::chrono::time_point<std::chrono::system_clock>(std::chrono::days(16861));
+	time = MessirLogger::Convert_system_clock_to_UTC(time);
+	std::string formatted_str = target.Return_formatted_time(format_str, time);
+	bool match = expected_str == formatted_str;
+	ASSERT_TRUE(match);
+}
+
+TEST(Formatter_tests, Time_formatter_date_test_04) {
+	std::string expected_str = "2000,00,04,Apr,29";
+	TestTarget target;
+	std::string format_str = "%%year,%%yr,%%month,%%monstr,%%day";
+	std::chrono::time_point<std::chrono::system_clock> time =
+		std::chrono::time_point<std::chrono::system_clock>(std::chrono::days(11076));
+	time = MessirLogger::Convert_system_clock_to_UTC(time);
+	std::string formatted_str = target.Return_formatted_time(format_str, time);
+	bool match = expected_str == formatted_str;
+	ASSERT_TRUE(match);
+}
+
+TEST(Formatter_tests, Time_formatter_date_test_05) {
+	std::string expected_str = "1975,75,05,May,30";
+	TestTarget target;
+	std::string format_str = "%%year,%%yr,%%month,%%monstr,%%day";
+	std::chrono::time_point<std::chrono::system_clock> time =
+		std::chrono::time_point<std::chrono::system_clock>(std::chrono::days(1975));
+	time = MessirLogger::Convert_system_clock_to_UTC(time);
+	std::string formatted_str = target.Return_formatted_time(format_str, time);
+	bool match = expected_str == formatted_str;
+	ASSERT_TRUE(match);
+}
+
+TEST(Formatter_tests, Time_formatter_date_test_06) {
+	std::string expected_str = "2032,32,06,Jun,16";
+	TestTarget target;
+	std::string format_str = "%%year,%%yr,%%month,%%monstr,%%day";
+	std::chrono::time_point<std::chrono::system_clock> time =
+		std::chrono::time_point<std::chrono::system_clock>(std::chrono::days(22812));
+	time = MessirLogger::Convert_system_clock_to_UTC(time);
+	std::string formatted_str = target.Return_formatted_time(format_str, time);
+	bool match = expected_str == formatted_str;
+	ASSERT_TRUE(match);
+}
+
+TEST(Formatter_tests, Time_formatter_date_test_07) {
+	std::string expected_str = "1988,88,07,Jul,04";
+	TestTarget target;
+	std::string format_str = "%%year,%%yr,%%month,%%monstr,%%day";
+	std::chrono::time_point<std::chrono::system_clock> time =
+		std::chrono::time_point<std::chrono::system_clock>(std::chrono::days(6759));
+	time = MessirLogger::Convert_system_clock_to_UTC(time);
+	std::string formatted_str = target.Return_formatted_time(format_str, time);
+	bool match = expected_str == formatted_str;
+	ASSERT_TRUE(match);
+}
+
+TEST(Formatter_tests, Time_formatter_date_test_08) {
+	std::string expected_str = "1996,96,08,Aug,30";
+	TestTarget target;
+	std::string format_str = "%%year,%%yr,%%month,%%monstr,%%day";
+	std::chrono::time_point<std::chrono::system_clock> time =
+		std::chrono::time_point<std::chrono::system_clock>(std::chrono::days(9738));
+	time = MessirLogger::Convert_system_clock_to_UTC(time);
+	std::string formatted_str = target.Return_formatted_time(format_str, time);
+	bool match = expected_str == formatted_str;
+	ASSERT_TRUE(match);
+}
+
+TEST(Formatter_tests, Time_formatter_date_test_09) {
+	std::string expected_str = "2011,11,09,Sep,14";
+	TestTarget target;
+	std::string format_str = "%%year,%%yr,%%month,%%monstr,%%day";
+	std::chrono::time_point<std::chrono::system_clock> time =
+		std::chrono::time_point<std::chrono::system_clock>(std::chrono::days(15231));
+	time = MessirLogger::Convert_system_clock_to_UTC(time);
+	std::string formatted_str = target.Return_formatted_time(format_str, time);
+	bool match = expected_str == formatted_str;
+	ASSERT_TRUE(match);
+}
+
+TEST(Formatter_tests, Time_formatter_date_test_10) {
+	std::string expected_str = "1987,87,10,Oct,28";
+	TestTarget target;
+	std::string format_str = "%%year,%%yr,%%month,%%monstr,%%day";
+	std::chrono::time_point<std::chrono::system_clock> time =
+		std::chrono::time_point<std::chrono::system_clock>(std::chrono::days(6509));
+	time = MessirLogger::Convert_system_clock_to_UTC(time);
+	std::string formatted_str = target.Return_formatted_time(format_str, time);
+	bool match = expected_str == formatted_str;
+	ASSERT_TRUE(match);
+}
+
+TEST(Formatter_tests, Time_formatter_date_test_11) {
+	std::string expected_str = "1999,99,11,Nov,21";
+	TestTarget target;
+	std::string format_str = "%%year,%%yr,%%month,%%monstr,%%day";
+	std::chrono::time_point<std::chrono::system_clock> time =
+		std::chrono::time_point<std::chrono::system_clock>(std::chrono::days(10916));
+	time = MessirLogger::Convert_system_clock_to_UTC(time);
+	std::string formatted_str = target.Return_formatted_time(format_str, time);
+	bool match = expected_str == formatted_str;
+	ASSERT_TRUE(match);
+}
+
+TEST(Formatter_tests, Time_formatter_date_test_12) {
+	std::string expected_str = "1996,96,12,Dec,29";
+	TestTarget target;
+	std::string format_str = "%%year,%%yr,%%month,%%monstr,%%day";
+	std::chrono::time_point<std::chrono::system_clock> time =
+		std::chrono::time_point<std::chrono::system_clock>(std::chrono::days(9859));
+	time = MessirLogger::Convert_system_clock_to_UTC(time);
+	std::string formatted_str = target.Return_formatted_time(format_str, time);
+	bool match = expected_str == formatted_str;
+	ASSERT_TRUE(match);
+}
+
+TEST(Formatter_tests, Time_formatter_datatime_test_00) {
+	std::string expected_str = "1970-01-01 00:00:00,1970-01-01,00:00:00.0000000";
+	TestTarget target;
+	std::string format_str = "%%datatime,%%date,%%time";
+	std::chrono::time_point<std::chrono::system_clock> time;
+	std::string formatted_str = target.Return_formatted_time(format_str, time);
+	time = MessirLogger::Convert_system_clock_to_UTC(time);
+	bool match = expected_str == formatted_str;
+	ASSERT_TRUE(match);
+}
+
+TEST(Formatter_tests, Time_formatter_datatime_test_01) {
+	std::string expected_str = "2035-09-20 01:02:03,2035-09-20,01:02:03.0040000";
+	TestTarget target;
+	std::string format_str = "%%datatime,%%date,%%time";
+	std::chrono::time_point<std::chrono::system_clock> time =
+		std::chrono::time_point<std::chrono::system_clock>(
+			std::chrono::hours(1) + std::chrono::minutes(2) +
+			std::chrono::seconds(3) + std::chrono::milliseconds(4) +
+			std::chrono::days(24003));
+	std::string formatted_str = target.Return_formatted_time(format_str, time);
+	time = MessirLogger::Convert_system_clock_to_UTC(time);
+	bool match = expected_str == formatted_str;
+	ASSERT_TRUE(match);
+}
+
+TEST(Formatter_tests, Time_formatter_datatime_test_02) {
+	std::string expected_str = "2021-10-17 12:34:56,2021-10-17,12:34:56.7890000";
+	TestTarget target;
+	std::string format_str = "%%datatime,%%date,%%time";
+	std::chrono::time_point<std::chrono::system_clock> time =
+		std::chrono::time_point<std::chrono::system_clock>(
+			std::chrono::hours(12) + std::chrono::minutes(34) +
+			std::chrono::seconds(56) + std::chrono::milliseconds(789) +
+			std::chrono::days(18917));
+	std::string formatted_str = target.Return_formatted_time(format_str, time);
+	time = MessirLogger::Convert_system_clock_to_UTC(time);
+	bool match = expected_str == formatted_str;
+	ASSERT_TRUE(match);
 }
 
 /**
@@ -199,8 +464,7 @@ struct Logger_dispatch_tests : public testing::Test {
 		logger->Add_target(test_target_EVENT);
 
 		logger->Configure(default_config);
-
-		logger->Initialize();
+		logger->Start();
 	}
 
 	void TearDown() {
@@ -384,7 +648,7 @@ struct File_target_tests : public testing::Test {
 			false
 		};
 		logger->Configure(default_config);
-		logger->Initialize();
+		logger->Start();
 	}
 
 	void TearDown() {
@@ -421,6 +685,41 @@ TEST_F(File_target_tests, FileTarget_test) {
 	ASSERT_TRUE(line == expected_log_message);
 }
 
+struct File_target_err_tests : public testing::Test {
+
+	MessirLogger::Logger* logger;
+	std::string expected_file_name = "file_target_test.log";
+
+	void SetUp() {
+		logger = new MessirLogger::Logger;
+
+		MessirLogger::LoggerConfig default_config = {
+			{
+				std::make_shared<MessirLogger::FileTargetConfig>("FileTarget",
+					"", "", "file_target_test",
+					0, 0, "", "", "%%path%%filename%%suffix"),
+			},
+			{
+				{MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKind::KIND_ALL, {"FileTarget"}},
+			},
+			false,
+			false
+		};
+		logger->Configure(default_config);
+	}
+
+	void TearDown() {
+		delete logger;
+		std::filesystem::remove(expected_file_name);
+	}
+};
+
+TEST_F(File_target_err_tests, File_already_open_test) {
+
+	std::ofstream file(expected_file_name, std::ios::out | std::ios::app);
+	EXPECT_THROW(logger->Start(), std::runtime_error);
+}
+
 /**
  * Logger_async_tests tests the asynchronous logging mode.
  */
@@ -448,8 +747,6 @@ struct Logger_async_tests : public testing::Test {
 		logger->Add_target(test_target_INFO);
 
 		logger->Configure(default_config);
-
-		logger->Initialize();
 	}
 
 	void TearDown() {
@@ -472,7 +769,7 @@ TEST_F(Logger_async_tests, Async_test) {
 	// negative record check
 	ASSERT_FALSE(Contains_log_message(*test_target_INFO, test_record1));
 	// start thread - we need to wait for thread to start
-	logger->Start_async_logging();
+	logger->Start();
 	std::this_thread::sleep_for(std::chrono::microseconds(10));
 	// second log to trigger semaphore
 	logger->Log_entry(test_record2);
@@ -510,8 +807,6 @@ struct Logger_maintenance_tests : public testing::Test {
 		logger->Add_target(test_target_INFO);
 
 		logger->Configure(default_config);
-
-		logger->Initialize();
 	}
 
 	void TearDown() {
@@ -524,20 +819,9 @@ TEST_F(Logger_maintenance_tests, Maintenance_test) {
 	// negative check maintenance called
 	ASSERT_FALSE(Check_maintenance_called(*test_target_INFO));
 	// start maintenance thread
-	logger->Start_logger_maintainer();
+	logger->Start();
 	// we need to wait for thread to start
 	std::this_thread::sleep_for(std::chrono::microseconds(10));
 	// check maintenance called
 	ASSERT_TRUE(Check_maintenance_called(*test_target_INFO));
 }
-
-// additional test ideas, probably externally implemented?
-// concurrency tests - asynchronous mode, maintenance thread, etc...
-// integration tests - test with circuits?
-// edge cases / errors - file permission
-// performance tests - heavy load in asynchronous mode, many targets, etc...
-
-// test stdout
-//testing::internal::CaptureStdout();
-//std::cout << "My test";
-//std::string output = testing::internal::GetCapturedStdout();

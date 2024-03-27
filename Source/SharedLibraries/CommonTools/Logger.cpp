@@ -1,3 +1,5 @@
+#include "stdafx.h"
+
 #include <Logger.h>
 
 #include <LogTargetStandardOutput.h>
@@ -33,7 +35,7 @@ namespace MessirLogger {
 		default: return "UNKNOWN";
 		}
 	}
-	// TODO@CONSIDER: do we want to check the time also?
+
 	bool operator==(const LogRecord& lhs, const LogRecord& rhs) {
 		return lhs.log_level == rhs.log_level &&
 			lhs.log_kind == rhs.log_kind &&
@@ -41,6 +43,7 @@ namespace MessirLogger {
 			lhs.source.line() == rhs.source.line() &&
 			lhs.source_entity == rhs.source_entity &&
 			lhs.log_message == rhs.log_message;
+		// do we want to check the time also?
 	}
 
 	bool operator==(const DispatchEntry& lhs, const DispatchEntry& rhs) {
@@ -68,10 +71,25 @@ namespace MessirLogger {
 				rhs._dispatch_config.begin()) &&
 			std::equal(lhs._target_configs.begin(), lhs._target_configs.end(),
 				rhs._target_configs.begin(),
-				[](const std::shared_ptr<TargetConfig>& lhsConfig,
-					const std::shared_ptr<TargetConfig>& rhsConfig) {
-						return *lhsConfig == *rhsConfig;
+				[](const std::shared_ptr<TargetConfig>& lhs_config,
+					const std::shared_ptr<TargetConfig>& rhs_config) {
+						return *lhs_config == *rhs_config;
 				});
+	}
+
+	std::chrono::system_clock::time_point Convert_system_clock_to_UTC(
+		const std::chrono::time_point<std::chrono::system_clock>& time) {
+
+		std::chrono::seconds seconds =
+			std::chrono::duration_cast<std::chrono::seconds>(time.time_since_epoch());
+
+		std::time_t time_t_value = std::chrono::system_clock::to_time_t(time);
+
+		std::tm* utc_tm = std::gmtime(&time_t_value);
+		std::time_t utc_time_t = std::mktime(utc_tm);
+
+		return std::chrono::system_clock::from_time_t(utc_time_t) +
+			(time.time_since_epoch() - seconds); // add ms back
 	}
 
 	// target
@@ -88,7 +106,6 @@ namespace MessirLogger {
 		return config;
 	}
 
-	// TODO@CONSIDER: check the performance here
 	std::string Target::Format_log_message(const LogRecord& record) {
 
 		std::string formatted_message(_format_string);
@@ -97,13 +114,12 @@ namespace MessirLogger {
 		const std::unordered_map<std::string, std::string> replacements {
 			{ "%%level", Log_level_to_string(record.log_level) },
 			{ "%%kind",  Log_kind_to_string(record.log_kind) },
-			// TODO@IMPLEMENT: split source_location into separate replacements?
-			// std::string(std::source_location::current().file_name()) + ":" + std::to_string(std::source_location::current().line()) + ":" + std::string(std::source_location::current().function_name())
 			{ "%%source",  [&]() {
 				std::string fullpath = record.source.file_name();
 				size_t pos = fullpath.find_last_of("/\\");
 				return (pos != std::string::npos) ? fullpath.substr(pos + 1) : fullpath;
-			}() + ":" + std::to_string(record.source.line()) },
+			}() },
+			{ "%%line",  std::to_string(record.source.line()) },
 			{ "%%entity",  record.source_entity },
 			{ "%%log", record.log_message },
 		};
@@ -119,34 +135,86 @@ namespace MessirLogger {
 
 		return formatted_message;
 	}
-	
-	// TODO@CONSIDER: check the performance here
-	std::string Target::Format_time(const std::string& input_str, const std::chrono::time_point<std::chrono::utc_clock>& time) {
+
+	std::string Target::Format_time(const std::string& input_str, const std::chrono::time_point<std::chrono::system_clock>& time) {
 
 		std::string formatted_str(input_str);
 		size_t pos;
 
-		size_t t_ms = std::chrono::duration_cast<
-			std::chrono::milliseconds>(time.time_since_epoch()).count() % 1000;
+		std::chrono::system_clock::time_point utc_time = Convert_system_clock_to_UTC(time);
+
+		std::chrono::days t_days = std::chrono::duration_cast<std::chrono::days>(time.time_since_epoch());
+		std::chrono::year_month_day t_ymd = std::chrono::year_month_day{ 
+			std::chrono::sys_days{std::chrono::days{0}} + t_days
+		};
+		size_t t_year = static_cast<int>(t_ymd.year());
+		size_t t_yr = t_year % 100;
+		size_t t_month = static_cast<unsigned>(t_ymd.month());
+		size_t t_day = static_cast<unsigned>(t_ymd.day());
+
+		size_t t_hour = static_cast<int>(std::chrono::duration_cast<
+			std::chrono::hours>(time.time_since_epoch()).count() % 24);
+		size_t t_min = static_cast<int>(std::chrono::duration_cast<
+			std::chrono::minutes>(time.time_since_epoch()).count() % 60);
+		size_t t_sec = static_cast<int>(std::chrono::duration_cast<
+			std::chrono::seconds>(time.time_since_epoch()).count() % 60);
+		size_t t_ms = static_cast<int>(std::chrono::duration_cast<
+			std::chrono::milliseconds>(time.time_since_epoch()).count() % 1000);
+		// TODO@ switch back to using std::format once gcc13 becomes available.
+		// Currently this C++20 feature is only available as of gcc13, which is only available
+		// in Debian 13 (trixie), which is currently the "testing" version thus
+		// 1) not appropriate for prooduction
+		// 2) not officially supported by Isode library.
+
 		// referenced the following for time formatting:
 		// https://en.cppreference.com/w/cpp/chrono/utc_clock/formatter
 		// https://stackoverflow.com/questions/17223096/outputting-date-and-time-in-c-using-stdchrono
+		//const std::unordered_map<std::string, std::string> replacements {
+		//	{ "%%datatime", std::format("{:%F %X}", time) },
+		//	{ "%%date", std::format("{:%F}", time) },
+		//	{ "%%year", std::format("{:%Y}", time) },
+		//	{ "%%yr", std::format("{:%y}", time) },
+		//	{ "%%month", std::format("{:%m}",time) },
+		//	{ "%%monstr", std::format("{:%b}",time) },
+		//	{ "%%day", std::format("{:%d}",time) },
+		//	{ "%%time", std::format("{:%T}", time) },
+		//	{ "%%hour", std::format("{:%H}",time) },
+		//	{ "%%min", std::format("{:%M}",time) },
+		//	{ "%%sec", std::format("{:%OS}",time) },
+		//	// {:%S} will format to "sec.millisec"
+		//	{ "%%decsec", std::format("{:%S}",time) },
+		//	{ "%%ms", t_ms < 100 ? (t_ms < 10 ?
+		//		"00" + std::to_string(t_ms) : "0" + std::to_string(t_ms)) : std::to_string(t_ms) },
+		//};
+
+		const char months[] = "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec";
+		std::string t_year_str = std::to_string(t_year);
+		std::string t_yr_str = t_year_str.substr(2);
+		std::string t_month_str =
+			t_month < 10 ? "0" + std::to_string(t_month) : std::to_string(t_month);
+		std::string t_day_str = t_day < 10 ? "0" + std::to_string(t_day) : std::to_string(t_day);
+		std::string t_hour_str = t_hour < 10 ? "0" + std::to_string(t_hour) : std::to_string(t_hour);
+		std::string t_min_str = t_min < 10 ? "0" + std::to_string(t_min) : std::to_string(t_min);
+		std::string t_sec_str = t_sec < 10 ? "0" + std::to_string(t_sec) : std::to_string(t_sec);
+		std::string t_ms_str = t_ms < 100 ? (t_ms < 10 ?
+			"00" + std::to_string(t_ms) : "0" + std::to_string(t_ms)) : std::to_string(t_ms);
+
+		std::string t_date_str = t_year_str + "-" + t_month_str + "-" + t_day_str;
+		std::string t_time_str = t_hour_str + ":" + t_min_str + ":" + t_sec_str + "." + t_ms_str + "0000";
+		std::string t_datatime_str = t_date_str + " " +	t_hour_str + ":" + t_min_str + ":" + t_sec_str;
 		const std::unordered_map<std::string, std::string> replacements {
-			{ "%%datatime", std::format("{:%F %X}", time) },
-			{ "%%date", std::format("{:%F}", time) },
-			{ "%%year", std::format("{:%Y}", time) },
-			{ "%%yr", std::format("{:%y}", time) },
-			{ "%%month", std::format("{:%m}",time) },
-			{ "%%monstr", std::format("{:%b}",time) },
-			{ "%%day", std::format("{:%d}",time) },
-			{ "%%time", std::format("{:%T}", time) },
-			{ "%%hour", std::format("{:%H}",time) },
-			{ "%%min", std::format("{:%M}",time) },
-			{ "%%sec", std::format("{:%OS}",time) },
-			// {:%S} will format to "sec.millisec"
-			{ "%%decsec", std::format("{:%S}",time) },
-			{ "%%ms", t_ms < 100 ? (t_ms < 10 ?
-				"00" + std::to_string(t_ms) : "0" + std::to_string(t_ms)) : std::to_string(t_ms) },
+			{ "%%datatime", t_datatime_str },
+			{ "%%date", t_date_str },
+			{ "%%year", t_year_str },
+			{ "%%yr", t_yr_str },
+			{ "%%month", t_month_str },
+			{ "%%monstr", std::string(&months[(t_month - 1) * 4], 3) },
+			{ "%%day", t_day_str },
+			{ "%%time", t_time_str },
+			{ "%%hour", t_hour_str },
+			{ "%%min", t_min_str },
+			{ "%%sec", t_sec_str },
+			{ "%%ms", t_ms_str },
 		};
 
 		for (const auto& [key, value] : replacements) {
@@ -192,39 +260,44 @@ namespace MessirLogger {
 	}
 
 	// logger
-	Logger::~Logger() {
+	Logger::~Logger() { this->Stop(); }
 
-		if (_logging_thread.joinable()) {
-			_logging_thread.request_stop();
-			_logging_thread.join();
+	void Logger::Initialize() {
+
+		if (_use_fallback && !_fallback_target) {
+			std::shared_ptr<TargetConfig> fallback_config =
+				std::make_shared<FileTargetConfig>("MessirComm", "", "", "FallbackLog",
+					0, 0, "", "", "", "");
+			_fallback_target = New_log_target(fallback_config->_target_type);
+			_fallback_target->Configure(*fallback_config);
+			_fallback_target->Initialize();
 		}
-		if (_maintenance_thread.joinable()) {
-			_maintenance_thread.request_stop();
-			_maintenance_thread.join();
+
+		for (const std::shared_ptr<Target>& target : _targets) {
+			target->Initialize();
 		}
 	}
 
-	void Logger::Manage_async_logging(std::stop_token stop_token) {
+	void Logger::Manage_async(std::stop_token stop_token) {
 
 		while (!stop_token.stop_requested()) {
 
 			bool clean_release = _logging_smph.try_acquire_for(std::chrono::seconds(10));
 			this->Handle_logs();
 		}
-		// TODO@CONSIDER: do we need to cleanup anything?
 	}
 
-	void Logger::Start_async_logging() {
+	void Logger::Start_async_manager() {
 		if (!this->_asynchronous_mode) {
 			return;
 		}
 
 		if (!_logging_thread.joinable()) {
-			_logging_thread = std::jthread([this](std::stop_token stop_token) { Manage_async_logging(stop_token); });
+			_logging_thread = std::jthread([this](std::stop_token stop_token) { Manage_async(stop_token); });
 		}
 	}
 
-	void Logger::Stop_async_logging() {
+	void Logger::Stop_async_manager() {
 
 		if (_logging_thread.joinable()) {
 			_logging_thread.request_stop();
@@ -239,17 +312,16 @@ namespace MessirLogger {
 			this->Maintain_targets();
 			std::this_thread::sleep_for(std::chrono::seconds(10));
 		}
-		// TODO@CONSIDER: do we need to cleanup anything?
 	}
 
-	void Logger::Start_logger_maintainer() {
+	void Logger::Start_maintainer() {
 
 		if (!_maintenance_thread.joinable()) {
 			_maintenance_thread = std::jthread([this](std::stop_token stop_token) { Manage_maintenance(stop_token); });
 		}
 	}
 
-	void Logger::Stop_logger_maintainer() {
+	void Logger::Stop_maintainer() {
 
 		if (_maintenance_thread.joinable()) {
 			_maintenance_thread.request_stop();
@@ -262,7 +334,23 @@ namespace MessirLogger {
 		for (const std::shared_ptr<Target>& target : _targets) {
 			target->Perform_maintenance();
 		}
-		// TODO@CONSIDER: do we need to cleanup anything?
+	}
+
+	void Logger::Start() {
+
+		std::unique_lock<std::recursive_mutex> logger_lock(_logger_mutex);
+
+		this->Initialize();
+		this->Start_async_manager();
+		this->Start_maintainer();
+	}
+
+	void Logger::Stop() {
+
+		std::unique_lock<std::recursive_mutex> logger_lock(_logger_mutex);
+
+		this->Stop_async_manager();
+		this->Stop_maintainer();
 	}
 
 	void Logger::Write_log(const LogRecord& record) {
@@ -301,7 +389,7 @@ namespace MessirLogger {
 		std::vector<LogRecord> tmp_records;
 
 		if (!_log_records.empty()) {
-			std::unique_lock<std::recursive_mutex> queue_lock(_log_records_mutex);
+			std::unique_lock<std::recursive_mutex> queue_lock(_logger_mutex);
 			_log_records.swap(tmp_records);
 		}
 
@@ -339,6 +427,8 @@ namespace MessirLogger {
 	}
 
 	void Logger::Configure(const LoggerConfig& config) {
+
+		std::unique_lock<std::recursive_mutex> logger_lock(_logger_mutex);
 
 		_use_fallback = config._use_fallback;
 		_asynchronous_mode = config._asynchronous_mode;
@@ -390,23 +480,9 @@ namespace MessirLogger {
 		}
 	}
 
-	void Logger::Initialize() {
-
-		if (_use_fallback && !_fallback_target) {
-			std::shared_ptr<TargetConfig> fallback_config =
-				std::make_shared<FileTargetConfig>("MessirComm", "", "", "FallbackLog",
-					0, 0, "", "", "", "");
-			_fallback_target = New_log_target(fallback_config->_target_type);
-			_fallback_target->Configure(*fallback_config);
-			_fallback_target->Initialize();
-		}
-
-		for (const std::shared_ptr<Target>& target : _targets) {
-			target->Initialize();
-		}
-	}
-
 	void Logger::Add_target(std::shared_ptr<Target> new_target) {
+
+		std::unique_lock<std::recursive_mutex> queue_lock(_logger_mutex);
 
 		std::vector<std::shared_ptr<Target>>::iterator it_target =
 			std::find_if(_targets.begin(), _targets.end(),
@@ -419,10 +495,22 @@ namespace MessirLogger {
 		}
 	}
 
+	void Logger::Reconfigure(const LoggerConfig& config) {
+		// block the logger
+		std::unique_lock<std::recursive_mutex> logger_lock(_logger_mutex);
+		this->Stop();
+		// clear the current targets
+		_targets.clear();
+		_dispatch_keys.clear();
+		// restart with new configuration
+		this->Configure(config);
+		this->Start();
+	}
+
 	void Logger::Log_entry(LogRecord record)
 	{
+		std::unique_lock<std::recursive_mutex> logger_lock(_logger_mutex);
 		if (_asynchronous_mode) {
-			std::unique_lock<std::recursive_mutex> queue_lock(_log_records_mutex);
 			_log_records.emplace_back(record);
 			_logging_smph.release();
 		}
@@ -434,15 +522,15 @@ namespace MessirLogger {
 	void Logger::Log_entry(LogLevel log_level, LogKind log_kind,
 		std::string log_message, std::source_location source, std::string source_entity)
 	{
+		std::unique_lock<std::recursive_mutex> logger_lock(_logger_mutex);
 		if (_asynchronous_mode) {
-			std::unique_lock<std::recursive_mutex> queue_lock(_log_records_mutex);
 			_log_records.emplace_back(log_level, log_kind, source, source_entity,
-				log_message, std::chrono::utc_clock::now());
+				log_message, std::chrono::system_clock::now());
 			_logging_smph.release();
 		}
 		else {
 			Write_log(LogRecord(log_level, log_kind, source, source_entity,
-				log_message, std::chrono::utc_clock::now()));
+				log_message, std::chrono::system_clock::now()));
 		}
 	}
 }

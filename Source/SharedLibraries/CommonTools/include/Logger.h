@@ -1,22 +1,17 @@
 #pragma once
+#include <CommonToolsMisc.h>
+
 #include <string>
-//#include <iostream> // TODO@CONSIDER: for std::stringstream?
-//#include <sstream> // TODO@CONSIDER: for std::stringstream?
-//#include <memory> // TODO@CONSIDER: included in other include? - need for smart pointers.
 #include <set>
 #include <vector>
-
+#include <mutex>
+#include <thread>
 //#include <SerializerJSON.h>
-#include <format> // TODO@CONSIDER: this causes a build error in pipeline? can be ignored, problem with C++ standard not supported
-#include <chrono> // TODO@CONSIDER: without this library, get compile errors for unique_lock, recursive_mutex, jthread
-//#include <iomanip> // TODO@CONSIDER: is this included in another include? - is an io library?
-#include <source_location> // TODO@CONSIDER use this to replace the call to __FILE__ and __LINE__
-
+//#include <format>
+#include <chrono>
+#include <source_location>
 #include <semaphore>
 
-// required for module to be used by other modules
-#include <configure.h>
-#include <afxver_.h>
 #ifndef _WINDOWS
 #define COMMONTOOLS_EXPORT
 #endif
@@ -24,19 +19,50 @@
 /**
  * macros for logging, example usage:
  * MSS_DEBUG(LOG_TECHNICAL, "surpervision") << "This is my log message";
+ * MSS_INFO_EXTRA(LOG_TECHNICAL, "surpervision", "special_def") << "This is my log message";
  */
-#define MSS_DEBUG(kind, entity) log_line(MessirLogger::LogLevel::LEVEL_DEBUG, \
+#define MSS_DEBUG(kind, entity) \
+	log_line(MessirLogger::LogLevel::LEVEL_DEBUG, \
 	kind, source_location::current(), entity, __logger)
-#define MSS_INFO(kind, entity) log_line(MessirLogger::LogLevel::LEVEL_INFO, \
+#define MSS_DEBUG_EXTRA(kind, entity, extra_str) \
+	if (global_config.Active(extra_str)) \
+		log_line(MessirLogger::LogLevel::LEVEL_DEBUG, \
+		kind, source_location::current(), entity, __logger)
+#define MSS_INFO(kind, entity) \
+	log_line(MessirLogger::LogLevel::LEVEL_INFO, \
 	kind, source_location::current(), entity, __logger)
-#define MSS_WARN(kind, entity) log_line(MessirLogger::LogLevel::LEVEL_WARNING, \
+#define MSS_INFO_EXTRA(kind, entity, extra_str) \
+	if (global_config.Active(extra_str)) \
+		log_line(MessirLogger::LogLevel::LEVEL_INFO, \
+		kind, source_location::current(), entity, __logger)
+#define MSS_WARNING(kind, entity) \
+	log_line(MessirLogger::LogLevel::LEVEL_WARNING, \
 	kind, source_location::current(), entity, __logger)
-#define MSS_ERROR(kind, entity) log_line(MessirLogger::LogLevel::LEVEL_ERROR, \
+#define MSS_WARNING_EXTRA(kind, entity, extra_str) \
+	if (global_config.Active(extra_str)) \
+		log_line(MessirLogger::LogLevel::LEVEL_WARNING, \
+		kind, source_location::current(), entity, __logger)
+#define MSS_ERROR(kind, entity) \
+	log_line(MessirLogger::LogLevel::LEVEL_ERROR, \
 	kind, source_location::current(), entity, __logger)
-#define MSS_CRITICAL(kind, entity) log_line(MessirLogger::LogLevel::LEVEL_CRITICAL, \
+#define MSS_ERROR_EXTRA(kind, entity, extra_str) \
+	if (global_config.Active(extra_str)) \
+		log_line(MessirLogger::LogLevel::LEVEL_ERROR, \
+		kind, source_location::current(), entity, __logger)
+#define MSS_CRITICAL(kind, entity) \
+	log_line(MessirLogger::LogLevel::LEVEL_CRITICAL, \
 	kind, source_location::current(), entity, __logger)
-#define MSS_FATAL(kind, entity) log_line(MessirLogger::LogLevel::LEVEL_FATAL, \
+#define MSS_CRITICAL_EXTRA(kind, entity, extra_str) \
+	if (global_config.Active(extra_str)) \
+		log_line(MessirLogger::LogLevel::LEVEL_CRITICAL, \
+		kind, source_location::current(), entity, __logger)
+#define MSS_FATAL(kind, entity) \
+	log_line(MessirLogger::LogLevel::LEVEL_FATAL, \
 	kind, source_location::current(), entity, __logger)
+#define MSS_FATAL_EXTRA(kind, entity, extra_str) \
+	if (global_config.Active(extra_str)) \
+		log_line(MessirLogger::LogLevel::LEVEL_FATAL, \
+		kind, source_location::current(), entity, __logger)
 
 namespace MessirLogger {
 	// data structures
@@ -47,9 +73,9 @@ namespace MessirLogger {
 	enum LogLevel {
 		LEVEL_DEBUG, /**< lowest level, used by developers for debug info */
 		LEVEL_INFO, /**< default level */
-		LEVEL_WARNING, /**< */
-		LEVEL_ERROR, /**< */
-		LEVEL_CRITICAL, /**< */
+		LEVEL_WARNING, /**< an error that is non critical */
+		LEVEL_ERROR,
+		LEVEL_CRITICAL, /**< used for critical feature errors */
 		LEVEL_FATAL, /**< used for system crashes */
 		LOG_LEVEL_COUNT, /**< used to track number of log levels */
 	};
@@ -85,11 +111,10 @@ namespace MessirLogger {
 	struct LogRecord {
 		LogLevel log_level = LogLevel::LEVEL_INFO;
 		LogKind log_kind = LogKind::KIND_ALL;
-		// TODO@CONSIDER: how do we serialize source_location?
 		std::source_location source;
 		std::string source_entity;
 		std::string log_message;
-		std::chrono::time_point<std::chrono::utc_clock> log_time;
+		std::chrono::time_point<std::chrono::system_clock> log_time;
 	};
 
 	COMMONTOOLS_EXPORT bool operator==(const LogRecord& lhs, const LogRecord& rhs);
@@ -125,8 +150,16 @@ namespace MessirLogger {
 		std::string reason;
 	};
 
+	/**
+	 * convert local time to UTC time using time_t and tm
+	 *
+	 * @param time represented in local time with type system_clock
+	 * @return utc_time time represented in UTC time with type system_clock
+	 */
+	COMMONTOOLS_EXPORT std::chrono::system_clock::time_point Convert_system_clock_to_UTC(
+		const std::chrono::time_point<std::chrono::system_clock>& time);
+
 	// config
-	//TODO@CONSIDER: can these be JSONSerializable?
 	class COMMONTOOLS_EXPORT TargetConfig {
 
 	public:
@@ -144,7 +177,7 @@ namespace MessirLogger {
 	class COMMONTOOLS_EXPORT LoggerConfig {
 
 	public:
-		// TODO@CONSIDER: we use pointer to have polymorphic behaviour, but this means we can't serialize this object?
+		// we use pointer to have polymorphic behaviour, but this means we can't serialize this object?
 		std::vector<std::shared_ptr<TargetConfig>> _target_configs;
 		std::vector<DispatchEntry> _dispatch_config;
 		bool _use_fallback = true;
@@ -159,7 +192,7 @@ namespace MessirLogger {
 	protected:
 		std::string _target_name;
 		std::string _format_string =
-			"%%monstr %%day %%hour:%%min:%%decsec [%%source] [%%level:%%kind] [%%entity] - %%log";
+			"%%monstr %%day %%hour:%%min:%%sec.%%ms [%%source:%%line] [%%level:%%kind] [%%entity] - %%log";
 		TargetType _target_type;
 
 	protected:
@@ -179,7 +212,7 @@ namespace MessirLogger {
 		 * @return formatted_str formatted output
 		 */
 		std::string Format_time(const std::string& input_str,
-			const std::chrono::time_point<std::chrono::utc_clock>& time);
+			const std::chrono::time_point<std::chrono::system_clock>& time);
 
 	public:
 		std::string Get_target_name() const;
@@ -201,7 +234,6 @@ namespace MessirLogger {
 	 * @return target smart pointer to Target of TargetType
 	 */
 	COMMONTOOLS_EXPORT std::shared_ptr<Target> New_log_target(TargetType target_type);
-	TargetType Get_target_type(const std::shared_ptr<Target>& target);
 
 	// logger
 	/**
@@ -220,6 +252,8 @@ namespace MessirLogger {
 		std::shared_ptr<Target> _fallback_target;
 		bool _use_fallback = true;
 
+		std::recursive_mutex _logger_mutex;
+
 		std::jthread _logging_thread;
 		std::binary_semaphore _logging_smph {0};
 		bool _asynchronous_mode = true;
@@ -230,9 +264,18 @@ namespace MessirLogger {
 		std::vector<DispatchKey> _dispatch_keys;
 
 		std::vector<LogRecord> _log_records;
-		std::recursive_mutex	_log_records_mutex;
 
 	private:
+		void Initialize();
+
+		void Manage_async(std::stop_token stop_token);
+		void Start_async_manager();
+		void Stop_async_manager();
+
+		void Manage_maintenance(std::stop_token stop_token);
+		void Start_maintainer();
+		void Stop_maintainer();
+
 		void Maintain_targets();
 		/**
 		 * Dispatch log record and write to appropriate targets.
@@ -249,13 +292,8 @@ namespace MessirLogger {
 	public:
 		~Logger();
 
-		void Manage_async_logging(std::stop_token stop_token);
-		void Start_async_logging();
-		void Stop_async_logging();
-		
-		void Manage_maintenance(std::stop_token stop_token);
-		void Start_logger_maintainer();
-		void Stop_logger_maintainer();
+		void Start();
+		void Stop();
 
 		LoggerConfig Get_config();
 
@@ -266,9 +304,9 @@ namespace MessirLogger {
 		 */
 		void Configure(const LoggerConfig& config);
 
-		void Initialize();
-
 		void Add_target(std::shared_ptr<Target> target);
+
+		void Reconfigure(const LoggerConfig& config);
 
 		void Log_entry(LogRecord record);
 		/**

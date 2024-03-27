@@ -1,3 +1,5 @@
+#include "stdafx.h"
+
 #include <LogTargetStandardOutput.h>
 
 #include <iostream>

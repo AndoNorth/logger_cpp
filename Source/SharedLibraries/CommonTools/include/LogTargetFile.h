@@ -50,7 +50,7 @@ namespace MessirLogger {
 		std::ofstream _file;
 
 	private:
-		void Update_filename(const std::chrono::time_point<std::chrono::utc_clock>& time);
+		void Update_filename(const std::chrono::time_point<std::chrono::system_clock>& time);
 		void Reopen_file();
 
 	protected:

@@ -1,9 +1,10 @@
+#include "stdafx.h"
+
 #include <LogTargetFile.h>
 
 #include <filesystem>
 #include <unordered_map>
 
-// #include <CommonToolsMisc.h> // TODO@RESOLVE: including this gives compile errors
 
 namespace MessirLogger {
 
@@ -22,7 +23,7 @@ namespace MessirLogger {
 		_filename_time_format(filename_time_format)	{}
 
 	// target
-	void FileTarget::Update_filename(const std::chrono::time_point<std::chrono::utc_clock>& time) {
+	void FileTarget::Update_filename(const std::chrono::time_point<std::chrono::system_clock>& time) {
 
 		std::string formatted_filename(_filename_format);
 		size_t pos;
@@ -32,7 +33,7 @@ namespace MessirLogger {
 			{ "%%prefix", _prefix },
 			{ "%%filename", _filename },
 			{ "%%suffix", _suffix },
-			// { "%%pid", std::to_string(Get_pid())} // from CommonToolsMisc.cpp
+			{ "%%pid", std::to_string(::Get_current_pid())} // from CommonToolsMisc.cpp
 		};
 
 		for (const auto& [key, value] : replacements) {
@@ -68,7 +69,7 @@ namespace MessirLogger {
 
 	void FileTarget::Setup() {
 
-		this->Update_filename(std::chrono::utc_clock::now());
+		this->Update_filename(std::chrono::system_clock::now());
 		this->Reopen_file();
 	}
 
@@ -76,6 +77,7 @@ namespace MessirLogger {
 
 		bool update_filename = false;
 
+		// TODO@FIX: there may be a bug here since we use UTC time to check file lifetime
 		time_t now_time = time(NULL);
 		tm* time_info = gmtime(&now_time);
 
@@ -96,7 +98,7 @@ namespace MessirLogger {
 
 		if (update_filename) {
 
-			this->Update_filename(std::chrono::utc_clock::now());
+			this->Update_filename(std::chrono::system_clock::now());
 			this->Reopen_file();
 		}
 	}
