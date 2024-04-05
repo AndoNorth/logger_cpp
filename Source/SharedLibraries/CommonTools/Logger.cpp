@@ -1,15 +1,16 @@
 #include "stdafx.h"
 
-#include <Logger.h>
+#include "Logger.h"
 
-#include <LogTargetStandardOutput.h>
-#include <LogTargetStandardError.h>
-#include <LogTargetFile.h>
+#include "LogTargetStandardOutput.h"
+#include "LogTargetStandardError.h"
+#include "LogTargetFile.h"
 
 #include <unordered_map>
 #include <thread>
 #include <iostream>
 
+COMMONTOOLS_EXPORT MessirLogger::Logger __logger;
 
 namespace MessirLogger {
 
@@ -120,6 +121,7 @@ namespace MessirLogger {
 				return (pos != std::string::npos) ? fullpath.substr(pos + 1) : fullpath;
 			}() },
 			{ "%%line",  std::to_string(record.source.line()) },
+			//{ "%%function", std::to_string(record.source.function_name()) },
 			{ "%%entity",  record.source_entity },
 			{ "%%log", record.log_message },
 		};

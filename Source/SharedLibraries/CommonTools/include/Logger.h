@@ -1,5 +1,4 @@
 #pragma once
-#include <CommonToolsMisc.h>
 
 #include <string>
 #include <set>
@@ -12,6 +11,9 @@
 #include <source_location>
 #include <semaphore>
 
+#include "stdio.h"
+#include "stdarg.h"
+
 #ifndef _WINDOWS
 #define COMMONTOOLS_EXPORT
 #endif
@@ -19,50 +21,52 @@
 /**
  * macros for logging, example usage:
  * MSS_DEBUG(LOG_TECHNICAL, "surpervision") << "This is my log message";
- * MSS_INFO_EXTRA(LOG_TECHNICAL, "surpervision", "special_def") << "This is my log message";
+ * MSS_INFO_EXTRA("special_def", LOG_TECHNICAL, "surpervision") << "This is my log message";
+ * MSS_WARNING(LOG_TECHNICAL, "surpervision").Format("format_str, %s, %d, %ld", arg1, arg2, arg3);
  */
 #define MSS_DEBUG(kind, entity) \
-	log_line(MessirLogger::LogLevel::LEVEL_DEBUG, \
-	kind, source_location::current(), entity, __logger)
-#define MSS_DEBUG_EXTRA(kind, entity, extra_str) \
-	if (global_config.Active(extra_str)) \
-		log_line(MessirLogger::LogLevel::LEVEL_DEBUG, \
-		kind, source_location::current(), entity, __logger)
+	log_line(MessirLogger::LogLevel::LEVEL_DEBUG, kind, std::source_location::current(), entity, __logger)
+
 #define MSS_INFO(kind, entity) \
-	log_line(MessirLogger::LogLevel::LEVEL_INFO, \
-	kind, source_location::current(), entity, __logger)
-#define MSS_INFO_EXTRA(kind, entity, extra_str) \
-	if (global_config.Active(extra_str)) \
-		log_line(MessirLogger::LogLevel::LEVEL_INFO, \
-		kind, source_location::current(), entity, __logger)
+	log_line(MessirLogger::LogLevel::LEVEL_INFO, kind, std::source_location::current(), entity, __logger)
+
 #define MSS_WARNING(kind, entity) \
-	log_line(MessirLogger::LogLevel::LEVEL_WARNING, \
-	kind, source_location::current(), entity, __logger)
-#define MSS_WARNING_EXTRA(kind, entity, extra_str) \
-	if (global_config.Active(extra_str)) \
-		log_line(MessirLogger::LogLevel::LEVEL_WARNING, \
-		kind, source_location::current(), entity, __logger)
+	log_line(MessirLogger::LogLevel::LEVEL_WARNING, kind, std::source_location::current(), entity, __logger)
+
 #define MSS_ERROR(kind, entity) \
-	log_line(MessirLogger::LogLevel::LEVEL_ERROR, \
-	kind, source_location::current(), entity, __logger)
-#define MSS_ERROR_EXTRA(kind, entity, extra_str) \
-	if (global_config.Active(extra_str)) \
-		log_line(MessirLogger::LogLevel::LEVEL_ERROR, \
-		kind, source_location::current(), entity, __logger)
+	log_line(MessirLogger::LogLevel::LEVEL_ERROR, kind, std::source_location::current(), entity, __logger)
+
 #define MSS_CRITICAL(kind, entity) \
-	log_line(MessirLogger::LogLevel::LEVEL_CRITICAL, \
-	kind, source_location::current(), entity, __logger)
-#define MSS_CRITICAL_EXTRA(kind, entity, extra_str) \
-	if (global_config.Active(extra_str)) \
-		log_line(MessirLogger::LogLevel::LEVEL_CRITICAL, \
-		kind, source_location::current(), entity, __logger)
+	log_line(MessirLogger::LogLevel::LEVEL_CRITICAL, kind, std::source_location::current(), entity, __logger)
+
 #define MSS_FATAL(kind, entity) \
-	log_line(MessirLogger::LogLevel::LEVEL_FATAL, \
-	kind, source_location::current(), entity, __logger)
-#define MSS_FATAL_EXTRA(kind, entity, extra_str) \
+	log_line(MessirLogger::LogLevel::LEVEL_FATAL, kind, std::source_location::current(), entity, __logger)
+
+
+#define MSS_DEBUG_EXTRA(extra_str, kind, entity) \
 	if (global_config.Active(extra_str)) \
-		log_line(MessirLogger::LogLevel::LEVEL_FATAL, \
-		kind, source_location::current(), entity, __logger)
+		log_line(MessirLogger::LogLevel::LEVEL_DEBUG, kind, std::source_location::current(), entity, __logger)
+
+#define MSS_INFO_EXTRA(extra_str, kind, entity) \
+	if (global_config.Active(extra_str)) \
+		log_line(MessirLogger::LogLevel::LEVEL_INFO, kind, std::source_location::current(), entity, __logger)
+
+#define MSS_WARNING_EXTRA(extra_str, kind, entity) \
+	if (global_config.Active(extra_str)) \
+		log_line(MessirLogger::LogLevel::LEVEL_WARNING, kind, std::source_location::current(), entity, __logger)
+
+#define MSS_ERROR_EXTRA(extra_str, kind, entity) \
+	if (global_config.Active(extra_str)) \
+		log_line(MessirLogger::LogLevel::LEVEL_ERROR, kind, std::source_location::current(), entity, __logger)
+
+#define MSS_CRITICAL_EXTRA(extra_str, kind, entity) \
+	if (global_config.Active(extra_str)) \
+		log_line(MessirLogger::LogLevel::LEVEL_CRITICAL, kind, std::source_location::current(), entity, __logger)
+
+#define MSS_FATAL_EXTRA(extra_str, kind, entity) \
+	if (global_config.Active(extra_str)) \
+		log_line(MessirLogger::LogLevel::LEVEL_FATAL, kind, std::source_location::current(), entity, __logger)
+
 
 namespace MessirLogger {
 	// data structures
@@ -357,5 +361,14 @@ public:
 
 	~log_line() {
 		_logger.Log_entry(_level, _kind, this->str(), _source, _entity);
+	}
+
+	void Format(const char* format, ...) {
+		va_list arguments;
+		va_start(arguments, format);
+		char trace_text[800];
+		int  text_length = vsnprintf(trace_text, sizeof(trace_text) - 1, format, arguments);
+		va_end(arguments);
+		this->write(trace_text, text_length);
 	}
 };

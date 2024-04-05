@@ -28,6 +28,102 @@ static void BM_Trace(benchmark::State& state) {
 	state.SetLabel("Write trace n=" + std::to_string(state.range(0)) + " times");
 }
 
+/**
+ * referenced from trace.cpp in linux build for trace.Format().
+ */
+std::string Linux_trace_format(const char* format, ...)
+{
+	va_list arguments;
+	va_start(arguments, format);
+	char trace_text[800];
+	int  text_length = vsnprintf(trace_text, sizeof(trace_text) - 1, format, arguments);
+	va_end(arguments);
+	return std::string(trace_text);
+}
+
+/**
+ * referenced from trace.h in windows build for trace.Format().
+ */
+std::string Windows_trace_format(const char* format, ...) {
+	va_list g;
+	va_start(g, format);
+	CString buf;
+	buf.FormatV(format, g);
+	return (LPCSTR)buf;
+}
+
+static void BM_Linux_trace_format_int(benchmark::State& state) {
+
+	int test_int1 = 5;
+	int test_int2 = 10;
+
+	for (auto _ : state) {
+		for (int i = 0; i < state.range(0); i++) {
+			std::string out = Linux_trace_format("int1=%d, int2=%d", test_int1, test_int2);
+		}
+	}
+}
+
+static void BM_Linux_trace_format_str(benchmark::State& state) {
+
+	std::string test_str = "hello, world";
+
+	for (auto _ : state) {
+		for (int i = 0; i < state.range(0); i++) {
+			std::string out = Linux_trace_format("str=%s", test_str);
+		}
+	}
+}
+
+static void BM_Linux_trace_format_mixed(benchmark::State& state) {
+
+	std::string test_str = "hello, world";
+	int test_int1 = 5;
+	int test_int2 = 10;
+
+	for (auto _ : state) {
+		for (int i = 0; i < state.range(0); i++) {
+			std::string out = Linux_trace_format("str=%s, int1=%d, int2=%d", test_str, test_int1, test_int2);
+		}
+	}
+}
+
+static void BM_Windows_trace_format_int(benchmark::State& state) {
+
+	int test_int1 = 5;
+	int test_int2 = 10;
+
+	for (auto _ : state) {
+		for (int i = 0; i < state.range(0); i++) {
+			std::string out = Windows_trace_format("int1=%d, int2=%d", test_int1, test_int2);
+		}
+	}
+}
+
+static void BM_Windows_trace_format_str(benchmark::State& state) {
+
+	std::string test_str = "hello, world";
+
+	for (auto _ : state) {
+		for (int i = 0; i < state.range(0); i++) {
+			std::string out = Windows_trace_format("str=%s", test_str);
+		}
+	}
+}
+
+static void BM_Windows_trace_format_mixed(benchmark::State& state) {
+
+	std::string test_str = "hello, world";
+	int test_int1 = 5;
+	int test_int2 = 10;
+
+	for (auto _ : state) {
+		for (int i = 0; i < state.range(0); i++) {
+			std::string out = Windows_trace_format("str=%s, int1=%d, int2=%d", test_str, test_int1, test_int2);
+		}
+	}
+}
+
 // helper methods
 void Logger_Write_log(benchmark::State& state, MessirLogger::Logger* logger) {
 
@@ -62,11 +158,15 @@ public:
 	}
 };
 
-std::string Capture_stdout(std::function<void()> testFunction) {
+/**
+ * this method is used to supress the logger from printing to stdout
+ * , currently has a bug where when 10^5 still outputs to stdout
+*/
+std::string Capture_stdout(std::function<void()> predicate) {
 	CapturedStreamBuffer buffer;
 	std::streambuf* old_buffer = std::cout.rdbuf(&buffer);
 
-	testFunction();  // Execute the test function
+	predicate();
 
 	std::cout.rdbuf(old_buffer);  // Restore the original stream buffer
 	return buffer.Get_captured_output();
@@ -235,6 +335,36 @@ BENCHMARK_REGISTER_F(FileTarget_async, _)
 });
 
 BENCHMARK(BM_Trace)
+->Apply([](benchmark::internal::Benchmark* b) {
+	CustomRange_PowerOfTen(2, 5)(b);
+});
+
+BENCHMARK(BM_Linux_trace_format_int)
+->Apply([](benchmark::internal::Benchmark* b) {
+	CustomRange_PowerOfTen(2, 5)(b);
+});
+
+BENCHMARK(BM_Linux_trace_format_str)
+->Apply([](benchmark::internal::Benchmark* b) {
+	CustomRange_PowerOfTen(2, 5)(b);
+});
+
+BENCHMARK(BM_Linux_trace_format_mixed)
+->Apply([](benchmark::internal::Benchmark* b) {
+	CustomRange_PowerOfTen(2, 5)(b);
+});
+
+BENCHMARK(BM_Windows_trace_format_int)
+->Apply([](benchmark::internal::Benchmark* b) {
+	CustomRange_PowerOfTen(2, 5)(b);
+});
+
+BENCHMARK(BM_Windows_trace_format_str)
+->Apply([](benchmark::internal::Benchmark* b) {
+	CustomRange_PowerOfTen(2, 5)(b);
+});
+
+BENCHMARK(BM_Windows_trace_format_mixed)
 ->Apply([](benchmark::internal::Benchmark* b) {
 	CustomRange_PowerOfTen(2, 5)(b);
 });

@@ -1,6 +1,7 @@
 #include "stdafx.h"
 
-#include <LogTargetFile.h>
+#include "CommonToolsMisc.h"
+#include "LogTargetFile.h"
 
 #include <filesystem>
 #include <unordered_map>
