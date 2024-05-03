@@ -1,7 +1,9 @@
 #pragma once
 #include "Logger.h"
 
+
 #include <fstream>
+#include <tuple>
 
 namespace MessirLogger {
 
@@ -19,12 +21,31 @@ namespace MessirLogger {
 		std::string _filename_time_format;
 
 	public:
-		FileTargetConfig(const std::string& name, const std::string& format,
-			const std::string& filepath, const std::string& filename,
+		FileTargetConfig(const std::string& name = "undefined", const std::string& format = "",
+			const std::string& filepath = "", const std::string& filename = "",
 			const size_t& max_filesize = 0, const size_t& _log_frequency = 24,
 			const std::string& prefix = "", const std::string& suffix = "",
 			const std::string& filename_format = "",
 			const std::string& filename_time_format = "");
+
+		virtual void Serialize(JSONSerializer& serializer) override;
+		virtual void Deserialize(JSONSerializer& serializer) override;
+
+		auto GetExposedMembers() {
+			return std::tuple_cat(
+				TargetConfig::GetExposedMembers(),
+				members(
+					member("filepath", &FileTargetConfig::_filepath, this),
+					member("filename", &FileTargetConfig::_filename, this),
+					member("max_filesize", &FileTargetConfig::_max_filesize, this),
+					member("log_frequency", &FileTargetConfig::_log_frequency, this),
+					member("prefix", &FileTargetConfig::_prefix, this),
+					member("suffix", &FileTargetConfig::_suffix, this),
+					member("filename_format", &FileTargetConfig::_filename_format, this),
+					member("filename_time_format", &FileTargetConfig::_filename_time_format, this)
+				)
+			);
+		}
 	};
 
 	// target

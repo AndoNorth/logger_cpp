@@ -38,25 +38,64 @@ namespace MessirLogger {
 	}
 
 	bool operator==(const LogRecord& lhs, const LogRecord& rhs) {
-		return lhs.log_level == rhs.log_level &&
-			lhs.log_kind == rhs.log_kind &&
+		return lhs.level == rhs.level &&
+			lhs.kind == rhs.kind &&
 			lhs.source.file_name() == rhs.source.file_name() &&
 			lhs.source.line() == rhs.source.line() &&
 			lhs.source_entity == rhs.source_entity &&
-			lhs.log_message == rhs.log_message;
+			lhs.message == rhs.message;
 		// do we want to check the time also?
 	}
 
+
+	void DispatchEntry::Serialize(JSONSerializer& serializer) {
+		serializer << *this;
+	}
+
+	void DispatchEntry::Deserialize(JSONSerializer& serializer) {
+		serializer >> *this;
+	}
+
 	bool operator==(const DispatchEntry& lhs, const DispatchEntry& rhs) {
-		return lhs.log_kind == rhs.log_kind &&
-			lhs.log_level == rhs.log_level &&
-			lhs.targets == rhs.targets;
+		return lhs._kind == rhs._kind &&
+			lhs._level == rhs._level &&
+			lhs._targets == rhs._targets;
 	}
 
 	// config
 	TargetConfig::TargetConfig(const std::string& name, const std::string& format, TargetType type)
 		: _target_name(name), _format_string(format), _target_type(type) {}
+
 	TargetConfig::~TargetConfig() = default;
+
+	TargetConfig* TargetConfig::AllocateFromJSON(const nlohmann::json& _json) {
+		TargetConfig* result = nullptr;
+
+		switch (_json["target_type"].get<int>()) {
+		case TargetType::SYSTEM_OUT_TARGET:
+			result = new MessirLogger::TargetConfig();
+			break;
+		case TargetType::SYSTEM_ERR_TARGET:
+			result = new MessirLogger::TargetConfig();
+			break;
+		case TargetType::FILE_TARGET:
+			result = new MessirLogger::FileTargetConfig();
+			break;
+		default:
+			result = nullptr;
+			break;
+		}
+
+		return result;
+	}
+
+	void TargetConfig::Serialize(JSONSerializer& serializer) {
+		serializer << *this;
+	}
+
+	void TargetConfig::Deserialize(JSONSerializer& serializer) {
+		serializer >> *this;
+	}
 
 	bool operator==(const TargetConfig& lhs, const TargetConfig& rhs) {
 		return lhs._target_name == rhs._target_name &&
@@ -76,6 +115,14 @@ namespace MessirLogger {
 					const std::shared_ptr<TargetConfig>& rhs_config) {
 						return *lhs_config == *rhs_config;
 				});
+	}
+
+	void LoggerConfig::Serialize(JSONSerializer& serializer) {
+		serializer << *this;
+	}
+
+	void LoggerConfig::Deserialize(JSONSerializer& serializer) {
+		serializer >> *this;
 	}
 
 	std::chrono::system_clock::time_point Convert_system_clock_to_UTC(
@@ -113,8 +160,8 @@ namespace MessirLogger {
 		size_t pos;
 
 		const std::unordered_map<std::string, std::string> replacements {
-			{ "%%level", Log_level_to_string(record.log_level) },
-			{ "%%kind",  Log_kind_to_string(record.log_kind) },
+			{ "%%level", Log_level_to_string(record.level) },
+			{ "%%kind",  Log_kind_to_string(record.kind) },
 			{ "%%source",  [&]() {
 				std::string fullpath = record.source.file_name();
 				size_t pos = fullpath.find_last_of("/\\");
@@ -123,7 +170,7 @@ namespace MessirLogger {
 			{ "%%line",  std::to_string(record.source.line()) },
 			//{ "%%function", std::to_string(record.source.function_name()) },
 			{ "%%entity",  record.source_entity },
-			{ "%%log", record.log_message },
+			{ "%%log", record.message },
 		};
 
 		for (const auto& [key, value] : replacements) {
@@ -133,7 +180,7 @@ namespace MessirLogger {
 			}
 		}
 
-		formatted_message = Format_time(formatted_message, record.log_time);
+		formatted_message = Format_time(formatted_message, record.timestamp);
 
 		return formatted_message;
 	}
@@ -359,14 +406,14 @@ namespace MessirLogger {
 
 		std::set< std::shared_ptr<Target>> targets;
 
-		// collect a set of unique targets from dispatch keys which match filter
+		// collect a set of unique _targets from dispatch keys which match filter
 		for (const DispatchKey& dispatch_key : _dispatch_keys) {
 
-			if ((dispatch_key.log_kind == LogKind::KIND_ALL || record.log_kind == LogKind::KIND_ALL ||
-				record.log_kind == dispatch_key.log_kind) &&
-				static_cast<int>(record.log_level) >= static_cast<int>(dispatch_key.log_level))
+			if ((dispatch_key._kind == LogKind::KIND_ALL || record.kind == LogKind::KIND_ALL ||
+				record.kind == dispatch_key._kind) &&
+				static_cast<int>(record.level) >= static_cast<int>(dispatch_key._level))
 			{
-				for (const std::shared_ptr<Target>& target : dispatch_key.targets) {
+				for (const std::shared_ptr<Target>& target : dispatch_key._targets) {
 					targets.insert(target);
 				}
 			}
@@ -410,11 +457,11 @@ namespace MessirLogger {
 		// dispatch config
 		for (const DispatchKey& key : _dispatch_keys) {
 			DispatchEntry entry;
-			entry.log_level = key.log_level;
-			entry.log_kind = key.log_kind;
+			entry._level = key._level;
+			entry._kind = key._kind;
 
-			for (const std::shared_ptr <Target>& target : key.targets) {
-				entry.targets.insert(target->Get_target_name());
+			for (const std::shared_ptr <Target>& target : key._targets) {
+				entry._targets.insert(target->Get_target_name());
 			}
 
 			config._dispatch_config.push_back(entry);
@@ -435,7 +482,7 @@ namespace MessirLogger {
 		_use_fallback = config._use_fallback;
 		_asynchronous_mode = config._asynchronous_mode;
 
-		// create targets from config
+		// create _targets from config
 		for (const std::shared_ptr<TargetConfig>& config : config._target_configs) {
 			std::shared_ptr<Target> new_target = New_log_target(config->_target_type);
 			if (new_target) {
@@ -449,16 +496,16 @@ namespace MessirLogger {
 			std::vector<DispatchKey>::iterator it_existing_key =
 				std::find_if(_dispatch_keys.begin(), _dispatch_keys.end(),
 					[&](const DispatchKey& key) {
-						return key.log_level == dispatch_entry.log_level &&
-							key.log_kind == dispatch_entry.log_kind;
+						return key._level == dispatch_entry._level &&
+							key._kind == dispatch_entry._kind;
 					});
 
 			if (it_existing_key == _dispatch_keys.end()) {
 				it_existing_key = _dispatch_keys.emplace(_dispatch_keys.end(),
-					dispatch_entry.log_level, dispatch_entry.log_kind);
+					dispatch_entry._level, dispatch_entry._kind);
 			}
 
-			for (const std::string& target_name : dispatch_entry.targets) {
+			for (const std::string& target_name : dispatch_entry._targets) {
 				std::vector<std::shared_ptr<Target>>::iterator it_target =
 					std::find_if(_targets.begin(), _targets.end(),
 						[&](const std::shared_ptr<Target>& target) {
@@ -468,15 +515,15 @@ namespace MessirLogger {
 				if (it_target == _targets.end()) {
 					std::cerr << "[ERROR] \"" << target_name <<
 						"\" could not be found, check dispatch keys with" << "[level,kind]=["
-						<< Log_level_to_string(dispatch_entry.log_level) <<
-						"," << Log_kind_to_string(dispatch_entry.log_kind) << "]." << std::endl;
+						<< Log_level_to_string(dispatch_entry._level) <<
+						"," << Log_kind_to_string(dispatch_entry._kind) << "]." << std::endl;
 					continue;
 				}
 
-				it_existing_key->targets.insert(*it_target);
+				it_existing_key->_targets.insert(*it_target);
 			}
 
-			if (it_existing_key->targets.empty()) {
+			if (it_existing_key->_targets.empty()) {
 				_dispatch_keys.erase(it_existing_key);
 			}
 		}
@@ -501,7 +548,7 @@ namespace MessirLogger {
 		// block the logger
 		std::unique_lock<std::recursive_mutex> logger_lock(_logger_mutex);
 		this->Stop();
-		// clear the current targets
+		// clear the current _targets
 		_targets.clear();
 		_dispatch_keys.clear();
 		// restart with new configuration
@@ -536,3 +583,5 @@ namespace MessirLogger {
 		}
 	}
 }
+
+

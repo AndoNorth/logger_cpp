@@ -5,7 +5,6 @@
 #include <vector>
 #include <mutex>
 #include <thread>
-//#include <SerializerJSON.h>
 //#include <format>
 #include <chrono>
 #include <source_location>
@@ -17,6 +16,8 @@
 #ifndef _WINDOWS
 #define COMMONTOOLS_EXPORT
 #endif
+
+#include <SerializerJSON.h>
 
 /**
  * macros for logging, example usage:
@@ -92,7 +93,7 @@ namespace MessirLogger {
 	std::string Log_level_to_string(LogLevel level);
 
 	/**
-	 * Represents the log kind for distributing log records to targets which match.
+	 * Represents the log kind for distributing log records to _targets which match.
 	 */
 	enum LogKind {
 		KIND_ALL, /**< default level */
@@ -113,18 +114,18 @@ namespace MessirLogger {
 	 * Represents a log record, which has properties used to dispatch the log.
 	 */
 	struct LogRecord {
-		LogLevel log_level = LogLevel::LEVEL_INFO;
-		LogKind log_kind = LogKind::KIND_ALL;
+		LogLevel level = LogLevel::LEVEL_INFO;
+		LogKind kind = LogKind::KIND_ALL;
 		std::source_location source;
 		std::string source_entity;
-		std::string log_message;
-		std::chrono::time_point<std::chrono::system_clock> log_time;
+		std::string message;
+		std::chrono::time_point<std::chrono::system_clock> timestamp;
 	};
 
 	COMMONTOOLS_EXPORT bool operator==(const LogRecord& lhs, const LogRecord& rhs);
 
 	/**
-	 * Represents the target type, used to create objects of targets.
+	 * Represents the target type, used to create objects of _targets.
 	 */
 	enum TargetType {
 		SYSTEM_OUT_TARGET, /**< target writes to std::cout */
@@ -134,14 +135,29 @@ namespace MessirLogger {
 	};
 
 	/**
-	 * Represents a key-value pair, where key is [log_level, log_kind]
-	 * and value is [targets] which corresponds to target_names
+	 * Represents a key-value pair, where key is [_level, _kind]
+	 * and value is [_targets] which corresponds to target_names
 	 * used to generate dispatch key.
 	 */
-	struct DispatchEntry {
-		LogLevel log_level;
-		LogKind log_kind;
-		std::set<std::string> targets;
+	struct COMMONTOOLS_EXPORT DispatchEntry : public JSONSerializable {
+		LogLevel _level;
+		LogKind _kind;
+		std::set<std::string> _targets;
+
+		DispatchEntry(const LogLevel& level = LogLevel::LEVEL_INFO, const LogKind& kind = LogKind::KIND_ALL, const std::set<std::string>& targets = {})
+			: _level(level), _kind(kind), _targets(targets)
+		{}
+
+		virtual void Serialize(JSONSerializer& serializer) override;
+		virtual void Deserialize(JSONSerializer& serializer) override;
+
+		auto GetExposedMembers() {
+			return members(
+				member("level", &DispatchEntry::_level, this),
+				member("kind", &DispatchEntry::_kind, this),
+				member("targets", &DispatchEntry::_targets, this)
+			);
+		}
 	};
 
 	COMMONTOOLS_EXPORT bool operator==(const DispatchEntry& lhs, const DispatchEntry& rhs);
@@ -164,7 +180,7 @@ namespace MessirLogger {
 		const std::chrono::time_point<std::chrono::system_clock>& time);
 
 	// config
-	class COMMONTOOLS_EXPORT TargetConfig {
+	class COMMONTOOLS_EXPORT TargetConfig : public JSONSerializable {
 
 	public:
 		std::string _target_name;
@@ -172,13 +188,26 @@ namespace MessirLogger {
 		TargetType _target_type;
 
 	public:
-		TargetConfig(const std::string& name, const std::string& format, TargetType type);
+		TargetConfig(const std::string& name = "unamed", const std::string& format = "%%time [%%level] - %%log", TargetType type = LOG_TARGET_COUNT);
 		~TargetConfig();
+
+		static TargetConfig* AllocateFromJSON(const nlohmann::json& _json);
+
+		virtual void Serialize(JSONSerializer& serializer) override;
+		virtual void Deserialize(JSONSerializer& serializer) override;
+
+		auto GetExposedMembers() {
+			return members(
+				member("target_name", &TargetConfig::_target_name, this),
+				member("format_string", &TargetConfig::_format_string, this),
+				member("target_type", &TargetConfig::_target_type, this)
+			);
+		}
 	};
 
 	COMMONTOOLS_EXPORT bool operator==(const TargetConfig& lhs, const TargetConfig& rhs);
 
-	class COMMONTOOLS_EXPORT LoggerConfig {
+	class COMMONTOOLS_EXPORT LoggerConfig : public JSONSerializable {
 
 	public:
 		// we use pointer to have polymorphic behaviour, but this means we can't serialize this object?
@@ -186,6 +215,25 @@ namespace MessirLogger {
 		std::vector<DispatchEntry> _dispatch_config;
 		bool _use_fallback = true;
 		bool _asynchronous_mode = true;
+
+		LoggerConfig(const std::vector<std::shared_ptr<TargetConfig>>& targets = {}, 
+			const std::vector<DispatchEntry>& dispatches = {},
+			bool use_fallback = true,
+			bool async_mode = true)
+			: _target_configs(targets), _dispatch_config(dispatches), _use_fallback(use_fallback), _asynchronous_mode(async_mode)
+		{}
+
+		virtual void Serialize(JSONSerializer& serializer) override;
+		virtual void Deserialize(JSONSerializer& serializer) override;
+
+		auto GetExposedMembers() {
+			return members(
+				member("targets", &LoggerConfig::_target_configs, this),
+				member("dispatch", &LoggerConfig::_dispatch_config, this),
+				member("use_fallback", &LoggerConfig::_use_fallback, this),
+				member("asynchronous_mode", &LoggerConfig::_asynchronous_mode, this)
+			);
+		}
 	};
 
 	COMMONTOOLS_EXPORT bool operator==(const LoggerConfig& lhs, const LoggerConfig& rhs);
@@ -241,13 +289,13 @@ namespace MessirLogger {
 
 	// logger
 	/**
-	 * Represents a key-value pair, where key is [log_level, log_kind]
-	 * and value is [targets], generated from dispatch key.
+	 * Represents a key-value pair, where key is [_level, _kind]
+	 * and value is [_targets], generated from dispatch key.
 	 */
 	struct DispatchKey {
-		LogLevel log_level;
-		LogKind log_kind;
-		std::set<std::shared_ptr<Target>> targets;
+		LogLevel _level;
+		LogKind _kind;
+		std::set<std::shared_ptr<Target>> _targets;
 	};
 
 	class COMMONTOOLS_EXPORT Logger {
@@ -282,7 +330,7 @@ namespace MessirLogger {
 
 		void Maintain_targets();
 		/**
-		 * Dispatch log record and write to appropriate targets.
+		 * Dispatch log record and write to appropriate _targets.
 		 *
 		 * @param record
 		 */
@@ -316,9 +364,9 @@ namespace MessirLogger {
 		/**
 		 * API for logging.
 		 * 
-		 * @param log_level log level, used for dispatch
-		 * @param log_kind log type, used for dispatch e.g. TECHNICAL = for developers
-		 * @param log_message
+		 * @param _level log level, used for dispatch
+		 * @param _kind log type, used for dispatch e.g. TECHNICAL = for developers
+		 * @param message
 		 * @param source default value of "filename:line_no"
 		 * @param source_entity default value of ""
 		 */

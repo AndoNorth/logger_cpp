@@ -97,7 +97,7 @@ struct Configuration_tests : public testing::Test {
 	void SetUp() {
 		logger = new MessirLogger::Logger;
 
-		test_config = {
+		test_config = MessirLogger::LoggerConfig(
 			{
 				// TODO@CONSIDER: when format_str is empty it is replaced with default
 				// this causes the test to fail, if empty
@@ -120,11 +120,12 @@ struct Configuration_tests : public testing::Test {
 			},
 			false,
 			false
-		};
+		);
 		logger->Configure(test_config);
 	}
+	
 	void TearDown() {
-		// ensure file targets are cleaned up if created
+		// ensure file _targets are cleaned up if created
 		delete logger;
 		std::filesystem::remove(expected_file_name_1);
 		std::filesystem::remove(expected_file_name_2);
@@ -141,7 +142,7 @@ TEST_F(Configuration_tests, Reconfigure_test) {
 }
 
 /**
- * class created for validating targets generic API.
+ * class created for validating _targets generic API.
  */
 class TestTarget : public MessirLogger::Target {
 
@@ -187,7 +188,7 @@ bool Contains_log_message(const MessirLogger::Target& target, const MessirLogger
 }
 
 /**
- * helper method which checks whether test targets maintenance method was called.
+ * helper method which checks whether test _targets maintenance method was called.
  * 
  * @param target TestTarget as Target
  * 
@@ -202,7 +203,7 @@ bool Check_maintenance_called(const MessirLogger::Target& target) {
 }
 
 /**
- * Formatter_tests are to test the custom formatter in targets, max year tested = 2035.
+ * Formatter_tests are to test the custom formatter in _targets, max year tested = 2035.
  * useful debug logs: 
  *   std::cout << "expected=\"" << expected_str << "\",formatted=\"" << formatted_str << "\"" << std::endl;
  * test results validated using:
@@ -459,7 +460,7 @@ TEST(Formatter_tests, Time_formatter_datatime_test_02) {
 
 /**
  * Logger_dispatch_tests are to test the dispatch filtering system, we create a set of dispatch
- * entries, and log a record then check that the expected targets do/don't contain the log record.
+ * entries, and log a record then check that the expected _targets do/don't contain the log record.
  */
 struct Logger_dispatch_tests : public testing::Test {
 
@@ -478,7 +479,7 @@ struct Logger_dispatch_tests : public testing::Test {
 	void SetUp() {
 		logger = new MessirLogger::Logger;
 
-		MessirLogger::LoggerConfig default_config = {
+		MessirLogger::LoggerConfig default_config(
 			{},
 			{
 				{MessirLogger::LogLevel::LEVEL_DEBUG, MessirLogger::LogKind::KIND_ALL, {"TestTarget_DEBUG"}},
@@ -493,7 +494,7 @@ struct Logger_dispatch_tests : public testing::Test {
 			},
 			false,
 			false
-		};
+		);
 
 		test_target_DEBUG = std::make_shared<TestTarget>();
 		test_target_DEBUG->Configure(
@@ -722,7 +723,7 @@ struct File_target_tests : public testing::Test {
 	void SetUp() {
 		logger = new MessirLogger::Logger;
 
-		MessirLogger::LoggerConfig default_config = {
+		MessirLogger::LoggerConfig default_config(
 			{
 				std::make_shared<MessirLogger::FileTargetConfig>("FileTarget",
 					"[%%level:%%kind] - %%log", "", "file_target_test",
@@ -733,7 +734,7 @@ struct File_target_tests : public testing::Test {
 			},
 			false,
 			false
-		};
+		);
 		logger->Configure(default_config);
 		logger->Start();
 	}
@@ -780,7 +781,7 @@ struct File_target_err_tests : public testing::Test {
 	void SetUp() {
 		logger = new MessirLogger::Logger;
 
-		MessirLogger::LoggerConfig default_config = {
+		MessirLogger::LoggerConfig default_config(
 			{
 				std::make_shared<MessirLogger::FileTargetConfig>("FileTarget",
 					"", "", "file_target_test",
@@ -791,7 +792,7 @@ struct File_target_err_tests : public testing::Test {
 			},
 			false,
 			false
-		};
+		);
 		logger->Configure(default_config);
 	}
 
@@ -818,14 +819,14 @@ struct Logger_async_tests : public testing::Test {
 	void SetUp() {
 		logger = new MessirLogger::Logger;
 
-		MessirLogger::LoggerConfig default_config = {
+		MessirLogger::LoggerConfig default_config(
 			{},
 			{
 				{MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKind::KIND_ALL, {"TestTarget_INFO"}},
 			},
 			false,
 			true
-		};
+		);
 		test_target_INFO = std::make_shared<TestTarget>();
 		test_target_INFO->Configure(
 			*std::make_shared<MessirLogger::TargetConfig>("TestTarget_INFO", "",
@@ -878,14 +879,14 @@ struct Logger_maintenance_tests : public testing::Test {
 	void SetUp() {
 		logger = new MessirLogger::Logger;
 
-		MessirLogger::LoggerConfig default_config = {
+		MessirLogger::LoggerConfig default_config(
 			{},
 			{
 				{MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKind::KIND_ALL, {"TestTarget_INFO"}},
 			},
 			false,
 			true
-		};
+		);
 		test_target_INFO = std::make_shared<TestTarget>();
 		test_target_INFO->Configure(
 			*std::make_shared<MessirLogger::TargetConfig>("TestTarget_INFO", "",

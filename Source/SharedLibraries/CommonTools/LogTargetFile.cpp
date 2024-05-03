@@ -23,6 +23,14 @@ namespace MessirLogger {
 		_filename_format(filename_format),
 		_filename_time_format(filename_time_format)	{}
 
+	void FileTargetConfig::Serialize(JSONSerializer& serializer) {
+		serializer << *this;
+	}
+
+	void FileTargetConfig::Deserialize(JSONSerializer& serializer) {
+		serializer >> *this;
+	}
+
 	// target
 	void FileTarget::Update_filename(const std::chrono::time_point<std::chrono::system_clock>& time) {
 

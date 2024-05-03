@@ -180,7 +180,7 @@ public:
 public:
 	void SetUp(::benchmark::State& state) {
 		logger = new MessirLogger::Logger;
-		MessirLogger::LoggerConfig default_config = {
+		MessirLogger::LoggerConfig default_config(
 			{
 				std::make_shared<MessirLogger::TargetConfig>("StdOut",
 					"[%%level:%%kind] - %%log", MessirLogger::TargetType::SYSTEM_OUT_TARGET),
@@ -190,7 +190,7 @@ public:
 			},
 			false,
 			false
-		};
+		);
 		logger->Configure(default_config);
 		logger->Start();
 	}
@@ -214,7 +214,7 @@ public:
 public:
 	void SetUp(::benchmark::State& state) {
 		logger = new MessirLogger::Logger;
-		MessirLogger::LoggerConfig default_config = {
+		MessirLogger::LoggerConfig default_config(
 			{
 				std::make_shared<MessirLogger::TargetConfig>("StdOut",
 					"[%%level:%%kind] - %%log", MessirLogger::TargetType::SYSTEM_OUT_TARGET),
@@ -224,7 +224,7 @@ public:
 			},
 			false,
 			true
-		};
+		);
 		logger->Configure(default_config);
 		logger->Start();
 	}
@@ -249,7 +249,7 @@ public:
 public:
 	void SetUp(::benchmark::State& state) {
 		logger = new MessirLogger::Logger;
-		MessirLogger::LoggerConfig default_config = {
+		MessirLogger::LoggerConfig default_config(
 			{
 				std::make_shared<MessirLogger::FileTargetConfig>("FileTarget",
 					"[%%level:%%kind] - %%log", "", "performance_test",
@@ -260,7 +260,7 @@ public:
 			},
 			false,
 			false
-		};
+		);
 		logger->Configure(default_config);
 		logger->Start();
 	}
@@ -285,7 +285,7 @@ public:
 public:
 	void SetUp(::benchmark::State& state) {
 		logger = new MessirLogger::Logger;
-		MessirLogger::LoggerConfig default_config = {
+		MessirLogger::LoggerConfig default_config(
 			{
 				std::make_shared<MessirLogger::FileTargetConfig>("FileTarget",
 					"[%%level:%%kind] - %%log", "", "performance_test",
@@ -296,7 +296,7 @@ public:
 			},
 			false,
 			false
-		};
+		);
 		logger->Configure(default_config);
 		logger->Start();
 	}
