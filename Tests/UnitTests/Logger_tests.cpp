@@ -91,6 +91,7 @@ struct Configuration_tests : public testing::Test {
 
 	MessirLogger::Logger* logger;
 	MessirLogger::LoggerConfig test_config;
+	MessirLogger::LoggerConfig empty_config;
 	std::string expected_file_name_1 = "test1.log";
 	std::string expected_file_name_2 = "test2.log";
 
@@ -121,6 +122,11 @@ struct Configuration_tests : public testing::Test {
 			false,
 			false
 		);
+		empty_config = MessirLogger::LoggerConfig(
+			{}, {},
+			false,
+			false
+		);
 		logger->Configure(test_config);
 	}
 	
@@ -138,11 +144,50 @@ TEST_F(Configuration_tests, All_config_test) {
 
 TEST_F(Configuration_tests, Reconfigure_test) {
 	logger->Reconfigure(test_config);
+	logger->Stop(); // Reconfigure() starts threads, call to stop them before they delay tests
 	ASSERT_TRUE(test_config == logger->Get_config());
 }
 
+TEST_F(Configuration_tests, Reconfigure_empty_test) {
+	logger->Reconfigure(empty_config);
+	logger->Stop(); // Reconfigure() starts threads, call to stop them before they delay tests
+	ASSERT_TRUE(empty_config == logger->Get_config());
+}
+
+TEST_F(Configuration_tests, Configuration_JSONSerializer) {
+	JSONSerializer serializer;
+	test_config.Serialize(serializer);
+	std::string contents = serializer.m_json.dump();
+	// NOTE: default values may be filled in the output file, but not in this string comparison
+	std::string expected_contents = "{\"asynchronous_mode\":false,\"dispatch\":[{\"kind\":0,\"level\":0,\"targets\":[\"MessirCommErr\",\"MessirCommOut\"]},{\"kind\":3,\"level\":1,\"targets\":[\"FileTarget1\",\"FileTarget2\"]},{\"kind\":2,\"level\":1,\"targets\":[\"FileTarget1\",\"FileTarget2\"]},{\"kind\":0,\"level\":2,\"targets\":[\"FileTarget2\"]}],\"targets\":[{\"format_string\":\"[%%level:%%kind] [%%entity] - %%log\",\"target_name\":\"MessirCommOut\",\"target_type\":0},{\"format_string\":\"[%%level:%%kind] [%%entity] - %%log\",\"target_name\":\"MessirCommErr\",\"target_type\":1},{\"filename\":\"test1\",\"filename_format\":\"%%path%%filename%%suffix\",\"filename_time_format\":\"\",\"filepath\":\"\",\"format_string\":\"[%%level:%%kind] [%%entity] - %%log\",\"log_frequency\":0,\"max_filesize\":0,\"prefix\":\"\",\"suffix\":\"\",\"target_name\":\"FileTarget1\",\"target_type\":2},{\"filename\":\"test2\",\"filename_format\":\"%%path%%filename%%suffix\",\"filename_time_format\":\"\",\"filepath\":\"\",\"format_string\":\"%%time [%%level] - %%log\",\"log_frequency\":0,\"max_filesize\":0,\"prefix\":\"\",\"suffix\":\"\",\"target_name\":\"FileTarget2\",\"target_type\":2}],\"use_fallback\":false}";
+	ASSERT_TRUE(expected_contents == contents);
+}
+
+TEST_F(Configuration_tests, Configuration_empty_JSONSerializer) {
+	JSONSerializer serializer;
+	empty_config.Serialize(serializer);
+	std::string contents = serializer.m_json.dump();
+	// NOTE: default values may be filled in the output file, but not in this string comparison
+	std::string expected_contents = "{\"asynchronous_mode\":false,\"dispatch\":[],\"targets\":[],\"use_fallback\":false}";
+	ASSERT_TRUE(expected_contents == contents);
+}
 /**
- * class created for validating _targets generic API.
+ * test configuration persistence
+*/
+TEST_F(Configuration_tests, Save_load_test) {
+	ASSERT_TRUE(test_config == logger->Get_config());
+	std::string filetarget = "./config.json";
+	logger->Save_config(filetarget);
+	logger->Reconfigure(empty_config);
+	logger->Stop(); // Reconfigure() starts threads, call to stop them before they delay tests
+	ASSERT_TRUE(empty_config == logger->Get_config());
+	logger->Load_config(filetarget);
+	ASSERT_TRUE(test_config == logger->Get_config());
+	std::filesystem::remove(filetarget);
+}
+
+/**
+ * class created for validating Target generic API.
  */
 class TestTarget : public MessirLogger::Target {
 
@@ -460,7 +505,7 @@ TEST(Formatter_tests, Time_formatter_datatime_test_02) {
 
 /**
  * Logger_dispatch_tests are to test the dispatch filtering system, we create a set of dispatch
- * entries, and log a record then check that the expected _targets do/don't contain the log record.
+ * entries, and log a record then check that the expected targets do/don't contain the log record.
  */
 struct Logger_dispatch_tests : public testing::Test {
 

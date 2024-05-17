@@ -93,13 +93,13 @@ namespace MessirLogger {
 	std::string Log_level_to_string(LogLevel level);
 
 	/**
-	 * Represents the log kind for distributing log records to _targets which match.
+	 * Represents the log kind for distributing log records to targets which match.
 	 */
 	enum LogKind {
 		KIND_ALL, /**< default level */
-		KIND_TECHNICAL, /**< */
-		KIND_ACTION, /**< */
-		KIND_EVENT, /**< */
+		KIND_TECHNICAL, /**< used for developer logs */
+		KIND_ACTION, /**< for filtering user actions */
+		KIND_EVENT, /**< for filtering events */
 		LOG_KIND_COUNT, /**< used to track number of log kinds */
 	};
 
@@ -125,7 +125,7 @@ namespace MessirLogger {
 	COMMONTOOLS_EXPORT bool operator==(const LogRecord& lhs, const LogRecord& rhs);
 
 	/**
-	 * Represents the target type, used to create objects of _targets.
+	 * Represents the target type, used to create objects of targets.
 	 */
 	enum TargetType {
 		SYSTEM_OUT_TARGET, /**< target writes to std::cout */
@@ -135,17 +135,17 @@ namespace MessirLogger {
 	};
 
 	/**
-	 * Represents a key-value pair, where key is [_level, _kind]
-	 * and value is [_targets] which corresponds to target_names
+	 * Represents a key-value pair, where key is [level, kind]
+	 * and value is [targets] which corresponds to target_names
 	 * used to generate dispatch key.
 	 */
 	struct COMMONTOOLS_EXPORT DispatchEntry : public JSONSerializable {
-		LogLevel _level;
-		LogKind _kind;
-		std::set<std::string> _targets;
+		LogLevel level;
+		LogKind kind;
+		std::set<std::string> targets;
 
 		DispatchEntry(const LogLevel& level = LogLevel::LEVEL_INFO, const LogKind& kind = LogKind::KIND_ALL, const std::set<std::string>& targets = {})
-			: _level(level), _kind(kind), _targets(targets)
+			: level(level), kind(kind), targets(targets)
 		{}
 
 		virtual void Serialize(JSONSerializer& serializer) override;
@@ -153,9 +153,9 @@ namespace MessirLogger {
 
 		auto GetExposedMembers() {
 			return members(
-				member("level", &DispatchEntry::_level, this),
-				member("kind", &DispatchEntry::_kind, this),
-				member("targets", &DispatchEntry::_targets, this)
+				member("level", &DispatchEntry::level, this),
+				member("kind", &DispatchEntry::kind, this),
+				member("targets", &DispatchEntry::targets, this)
 			);
 		}
 	};
@@ -174,12 +174,16 @@ namespace MessirLogger {
 	 * convert local time to UTC time using time_t and tm
 	 *
 	 * @param time represented in local time with type system_clock
+	 * 
 	 * @return utc_time time represented in UTC time with type system_clock
 	 */
 	COMMONTOOLS_EXPORT std::chrono::system_clock::time_point Convert_system_clock_to_UTC(
 		const std::chrono::time_point<std::chrono::system_clock>& time);
 
 	// config
+	/**
+	 * Base for target config, containing the minimum parameters.
+	 */
 	class COMMONTOOLS_EXPORT TargetConfig : public JSONSerializable {
 
 	public:
@@ -188,9 +192,17 @@ namespace MessirLogger {
 		TargetType _target_type;
 
 	public:
-		TargetConfig(const std::string& name = "unamed", const std::string& format = "%%time [%%level] - %%log", TargetType type = LOG_TARGET_COUNT);
+		TargetConfig(const std::string& name = "unnamed", const std::string& format = "%%time [%%level] - %%log", TargetType type = LOG_TARGET_COUNT);
 		~TargetConfig();
 
+		/**
+		 * Returns appropriate TargetConfig for specified TargetType, used by Deserialize
+		 * e.g. <MessirLogger::FileTargetConfig>
+		 * 
+		 * @param json object containing TargetConfig member variables
+		 * 
+		 * @return config TargetConfig pointer specific to TargetType
+		 */
 		static TargetConfig* AllocateFromJSON(const nlohmann::json& _json);
 
 		virtual void Serialize(JSONSerializer& serializer) override;
@@ -207,10 +219,17 @@ namespace MessirLogger {
 
 	COMMONTOOLS_EXPORT bool operator==(const TargetConfig& lhs, const TargetConfig& rhs);
 
+	/**
+	 * Config used to setup logger.
+	 * 
+	 * @param targets vector of pointers to TargetConfig's
+	 * @param dispatches vector of DispatchEntries which will be converted to DispatchKeys
+	 * @param use_fallback bool to control use of fallback log target, default = true
+	 * @param async_mode bool to toggle asynchronous logging mode, default = true
+	 */
 	class COMMONTOOLS_EXPORT LoggerConfig : public JSONSerializable {
 
 	public:
-		// we use pointer to have polymorphic behaviour, but this means we can't serialize this object?
 		std::vector<std::shared_ptr<TargetConfig>> _target_configs;
 		std::vector<DispatchEntry> _dispatch_config;
 		bool _use_fallback = true;
@@ -239,6 +258,9 @@ namespace MessirLogger {
 	COMMONTOOLS_EXPORT bool operator==(const LoggerConfig& lhs, const LoggerConfig& rhs);
 
 	// target
+	/**
+	 * Log target base class, used as a template for derived log target behaviour.
+	 */
 	class COMMONTOOLS_EXPORT Target {
 
 	protected:
@@ -248,18 +270,49 @@ namespace MessirLogger {
 		TargetType _target_type;
 
 	protected:
+		/**
+		 * Method should be overridden, perform any setup required before enabling the target.
+		 */
 		virtual void Setup() = 0;
+		/**
+		 * Method should be overriden, perform the maintenance required by target if any.
+		 */
 		virtual void Maintenance() = 0;
+		/**
+		 * Method should be overriden, perform any cleanup and reenable the target.
+		 */
 		virtual void Refresh() = 0;
+		/**
+		 * Method should be overriden, attempt to write the log to target.
+		 * 
+		 * @param record LogRecord, to be written to target
+		 */
 		virtual TargetResult Try_write_log(const LogRecord& record) = 0;
+		/**
+		 * Method can be overriden, load config parameters into target.
+		 * 
+		 * @param config TargetConfig of appropriate TargetType e.g. FileTargetConfig->FileTarget
+		 */
 		virtual void Load_config(const TargetConfig& config);
+		/**
+		 * Method can be overriden, creates and returns a pointer of this target's configuration.
+		 * 
+		 * @return config TargetConfig pointer specific to this target's configuration
+		 */
 		virtual std::shared_ptr<TargetConfig> Export_config();
+		/**
+		 * Custom formatting of log message defined by _format_string.
+		 * 
+		 * @param record log record to be formatted
+		 * 
+		 * @return formatted_str formatted output
+		 */
 		std::string Format_log_message(const LogRecord& record);
 		/**
-		 * Wrapper for time formatting.
+		 * Custom formatting for time defined by _format_string.
 		 *
 		 * @param input_str unformatted input
-		 * @param time utc time used as reference for formatter
+		 * @param time system clock time used as reference for formatter
 		 *
 		 * @return formatted_str formatted output
 		 */
@@ -269,33 +322,48 @@ namespace MessirLogger {
 	public:
 		std::string Get_target_name() const;
 		std::shared_ptr<TargetConfig> Get_config();
+		/**
+		 * Interface to configure target.
+		 * 
+		 * @param config TargetConfig of appropriate TargetType e.g. FileTargetConfig->FileTarget
+		 */
 		void Configure(const TargetConfig& config);
+		/**
+		 * Interface to initialize target.
+		 */
 		void Initialize();
 		/**
-		 * Periodically run method
+		 * Interface to run maintenance.
 		 */
 		void Perform_maintenance();
+		/**
+		 * Interface to write log using target.
+		 * 
+		 * @param record LogRecord, to be written to target
+		 * 
+		 * @return result contains success bool and reason if false.
+		 */
 		TargetResult Write_log(const LogRecord& record);
 	};
 
 	/**
-	 * Create new log target of target_type.
+	 * Create and return new log target of TargetType.
 	 * 
 	 * @param target_type enum of TargetType used to instantiate target
 	 * 
-	 * @return target smart pointer to Target of TargetType
+	 * @return target pointer to Target of TargetType
 	 */
 	COMMONTOOLS_EXPORT std::shared_ptr<Target> New_log_target(TargetType target_type);
 
 	// logger
 	/**
-	 * Represents a key-value pair, where key is [_level, _kind]
-	 * and value is [_targets], generated from dispatch key.
+	 * Represents a key-value pair, where key is [level, kind]
+	 * and value is [targets], generated from dispatch key.
 	 */
 	struct DispatchKey {
-		LogLevel _level;
-		LogKind _kind;
-		std::set<std::shared_ptr<Target>> _targets;
+		LogLevel level;
+		LogKind kind;
+		std::set<std::shared_ptr<Target>> targets;
 	};
 
 	class COMMONTOOLS_EXPORT Logger {
@@ -323,23 +391,25 @@ namespace MessirLogger {
 		void Manage_async(std::stop_token stop_token);
 		void Start_async_manager();
 		void Stop_async_manager();
+		/**
+		 * Handle for asynchronous logging, to be used by async thread.
+		 */
+		void Handle_logs();
 
 		void Manage_maintenance(std::stop_token stop_token);
 		void Start_maintainer();
 		void Stop_maintainer();
-
-		void Maintain_targets();
 		/**
-		 * Dispatch log record and write to appropriate _targets.
+		 * Handle for maintaining targets, to be used by maintenance thread.
+		 */
+		void Maintain_targets();
+
+		/**
+		 * Dispatch log record and write to appropriate targets.
 		 *
 		 * @param record
 		 */
 		void Write_log(const LogRecord& record);
-		/**
-		 * Handle for asynchronous logging, to be used by a thread.
-		 *
-		 */
-		void Handle_logs();
 
 	public:
 		~Logger();
@@ -356,24 +426,53 @@ namespace MessirLogger {
 		 */
 		void Configure(const LoggerConfig& config);
 
+		/**
+		 * Interface to add targets.
+		 */
 		void Add_target(std::shared_ptr<Target> target);
 
+		/**
+		 * Reconfigure logger, stops and starts with the input configuration.
+		 * 
+		 * @param config LoggerConfig used to reconfigure logger
+		 */
 		void Reconfigure(const LoggerConfig& config);
 
-		void Log_entry(LogRecord record);
 		/**
 		 * API for logging.
 		 * 
-		 * @param _level log level, used for dispatch
-		 * @param _kind log type, used for dispatch e.g. TECHNICAL = for developers
-		 * @param message
-		 * @param source default value of "filename:line_no"
-		 * @param source_entity default value of ""
+		 * @param record LogRecord to be written
+		 */
+		void Log_entry(LogRecord record);
+
+		/**
+		 * API for logging.
+		 * 
+		 * @param level log level, used for dispatch
+		 * @param kind log type, used for dispatch e.g. TECHNICAL = for developers
+		 * @param log_message
+		 * @param source
+		 * @param source_entity default value of "", corresponds to context of log
 		 */
 		void Log_entry(LogLevel log_level, LogKind log_kind,
 			std::string log_message,
 			std::source_location source,
 			std::string source_entity = "");
+
+		/**
+		 * Persist config to file system.
+		 * 
+		 * @param filename output file target, includes path
+		 */
+		void Save_config(std::string filename);
+
+		/**
+		 * Load config from file system.
+		 *
+		 * @param filename input file target, includes path
+		 */
+		void Load_config(std::string filename);
+
 	};
 }
 
@@ -384,7 +483,7 @@ extern COMMONTOOLS_EXPORT MessirLogger::Logger __logger;
 
 /**
  * this is required to solve a LINK error,
- * we cannot direclty use COMMONTOOLS_EXPORT for std::stringstream.
+ * we cannot directly use COMMONTOOLS_EXPORT for std::stringstream.
  */
 class log_line_linking_stub : public std::stringstream {};
 
@@ -394,8 +493,8 @@ class log_line_linking_stub : public std::stringstream {};
 class COMMONTOOLS_EXPORT log_line : public log_line_linking_stub {
 
 public:
-	MessirLogger::LogLevel _level;
-	MessirLogger::LogKind _kind;
+	MessirLogger::LogLevel level;
+	MessirLogger::LogKind kind;
 	std::string _entity;
 	std::source_location _source;
 	MessirLogger::Logger& _logger;
@@ -403,12 +502,12 @@ public:
 public:
 	log_line(MessirLogger::LogLevel level, MessirLogger::LogKind kind,
 		std::source_location source, std::string entity, MessirLogger::Logger& logger)
-		: _level(level), _kind(kind), _source(source),
+		: level(level), kind(kind), _source(source),
 		_entity(entity), _logger(logger)
 	{}
 
 	~log_line() {
-		_logger.Log_entry(_level, _kind, this->str(), _source, _entity);
+		_logger.Log_entry(level, kind, this->str(), _source, _entity);
 	}
 
 	void Format(const char* format, ...) {

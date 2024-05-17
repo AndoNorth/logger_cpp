@@ -57,9 +57,9 @@ namespace MessirLogger {
 	}
 
 	bool operator==(const DispatchEntry& lhs, const DispatchEntry& rhs) {
-		return lhs._kind == rhs._kind &&
-			lhs._level == rhs._level &&
-			lhs._targets == rhs._targets;
+		return lhs.kind == rhs.kind &&
+			lhs.level == rhs.level &&
+			lhs.targets == rhs.targets;
 	}
 
 	// config
@@ -331,7 +331,7 @@ namespace MessirLogger {
 
 		while (!stop_token.stop_requested()) {
 
-			bool clean_release = _logging_smph.try_acquire_for(std::chrono::seconds(10));
+			bool clean_release = _logging_smph.try_acquire_for(std::chrono::seconds(2));
 			this->Handle_logs();
 		}
 	}
@@ -400,20 +400,22 @@ namespace MessirLogger {
 
 		this->Stop_async_manager();
 		this->Stop_maintainer();
+		// consume any remaining log records
+		this->Handle_logs();
 	}
 
 	void Logger::Write_log(const LogRecord& record) {
 
 		std::set< std::shared_ptr<Target>> targets;
 
-		// collect a set of unique _targets from dispatch keys which match filter
+		// collect a set of unique targets from dispatch keys which match filter
 		for (const DispatchKey& dispatch_key : _dispatch_keys) {
 
-			if ((dispatch_key._kind == LogKind::KIND_ALL || record.kind == LogKind::KIND_ALL ||
-				record.kind == dispatch_key._kind) &&
-				static_cast<int>(record.level) >= static_cast<int>(dispatch_key._level))
+			if ((dispatch_key.kind == LogKind::KIND_ALL || record.kind == LogKind::KIND_ALL ||
+				record.kind == dispatch_key.kind) &&
+				static_cast<int>(record.level) >= static_cast<int>(dispatch_key.level))
 			{
-				for (const std::shared_ptr<Target>& target : dispatch_key._targets) {
+				for (const std::shared_ptr<Target>& target : dispatch_key.targets) {
 					targets.insert(target);
 				}
 			}
@@ -438,8 +440,10 @@ namespace MessirLogger {
 		std::vector<LogRecord> tmp_records;
 
 		if (!_log_records.empty()) {
-			std::unique_lock<std::recursive_mutex> queue_lock(_logger_mutex);
-			_log_records.swap(tmp_records);
+			std::unique_lock<std::recursive_mutex> logger_lock(_logger_mutex, std::try_to_lock);
+			if (logger_lock.owns_lock()) {
+				_log_records.swap(tmp_records);
+			}
 		}
 
 		for (const LogRecord& record : tmp_records) {
@@ -457,11 +461,11 @@ namespace MessirLogger {
 		// dispatch config
 		for (const DispatchKey& key : _dispatch_keys) {
 			DispatchEntry entry;
-			entry._level = key._level;
-			entry._kind = key._kind;
+			entry.level = key.level;
+			entry.kind = key.kind;
 
-			for (const std::shared_ptr <Target>& target : key._targets) {
-				entry._targets.insert(target->Get_target_name());
+			for (const std::shared_ptr <Target>& target : key.targets) {
+				entry.targets.insert(target->Get_target_name());
 			}
 
 			config._dispatch_config.push_back(entry);
@@ -482,7 +486,7 @@ namespace MessirLogger {
 		_use_fallback = config._use_fallback;
 		_asynchronous_mode = config._asynchronous_mode;
 
-		// create _targets from config
+		// create targets from config
 		for (const std::shared_ptr<TargetConfig>& config : config._target_configs) {
 			std::shared_ptr<Target> new_target = New_log_target(config->_target_type);
 			if (new_target) {
@@ -496,16 +500,16 @@ namespace MessirLogger {
 			std::vector<DispatchKey>::iterator it_existing_key =
 				std::find_if(_dispatch_keys.begin(), _dispatch_keys.end(),
 					[&](const DispatchKey& key) {
-						return key._level == dispatch_entry._level &&
-							key._kind == dispatch_entry._kind;
+						return key.level == dispatch_entry.level &&
+							key.kind == dispatch_entry.kind;
 					});
 
 			if (it_existing_key == _dispatch_keys.end()) {
 				it_existing_key = _dispatch_keys.emplace(_dispatch_keys.end(),
-					dispatch_entry._level, dispatch_entry._kind);
+					dispatch_entry.level, dispatch_entry.kind);
 			}
 
-			for (const std::string& target_name : dispatch_entry._targets) {
+			for (const std::string& target_name : dispatch_entry.targets) {
 				std::vector<std::shared_ptr<Target>>::iterator it_target =
 					std::find_if(_targets.begin(), _targets.end(),
 						[&](const std::shared_ptr<Target>& target) {
@@ -515,15 +519,15 @@ namespace MessirLogger {
 				if (it_target == _targets.end()) {
 					std::cerr << "[ERROR] \"" << target_name <<
 						"\" could not be found, check dispatch keys with" << "[level,kind]=["
-						<< Log_level_to_string(dispatch_entry._level) <<
-						"," << Log_kind_to_string(dispatch_entry._kind) << "]." << std::endl;
+						<< Log_level_to_string(dispatch_entry.level) <<
+						"," << Log_kind_to_string(dispatch_entry.kind) << "]." << std::endl;
 					continue;
 				}
 
-				it_existing_key->_targets.insert(*it_target);
+				it_existing_key->targets.insert(*it_target);
 			}
 
-			if (it_existing_key->_targets.empty()) {
+			if (it_existing_key->targets.empty()) {
 				_dispatch_keys.erase(it_existing_key);
 			}
 		}
@@ -531,7 +535,7 @@ namespace MessirLogger {
 
 	void Logger::Add_target(std::shared_ptr<Target> new_target) {
 
-		std::unique_lock<std::recursive_mutex> queue_lock(_logger_mutex);
+		std::unique_lock<std::recursive_mutex> logger_lock(_logger_mutex);
 
 		std::vector<std::shared_ptr<Target>>::iterator it_target =
 			std::find_if(_targets.begin(), _targets.end(),
@@ -548,7 +552,7 @@ namespace MessirLogger {
 		// block the logger
 		std::unique_lock<std::recursive_mutex> logger_lock(_logger_mutex);
 		this->Stop();
-		// clear the current _targets
+		// clear the configuration
 		_targets.clear();
 		_dispatch_keys.clear();
 		// restart with new configuration
@@ -582,6 +586,60 @@ namespace MessirLogger {
 				log_message, std::chrono::system_clock::now()));
 		}
 	}
+
+	void Logger::Save_config(std::string filename) {
+		JSONSerializer tmp_serializer;
+		this->Get_config().Serialize(tmp_serializer);
+		std::string contents = tmp_serializer.m_json.dump();
+		std::ofstream file(filename);
+		if (!file.is_open()) {
+			// throw std::filesystem::filesystem_error("Failed to open file \"" + filename + "\"",
+			// 	std::make_error_code(std::errc::no_such_file_or_directory));
+			std::cout << "[WARNING] Save_config could not open config file \"" << filename << "\"" << std::endl;
+			return;
+		}
+		file << contents;
+		file.close();
+	}
+
+	void Logger::Load_config(std::string filename) {
+		if (!std::filesystem::exists(filename)) {
+			
+			std::cout << "[WARNING] Load_config \"" << filename << "\" was not found, configured using default_config" << std::endl;
+
+			static MessirLogger::LoggerConfig default_config(
+				{
+					std::make_shared<MessirLogger::TargetConfig>("MessirComm", "", MessirLogger::TargetType::SYSTEM_OUT_TARGET),
+					std::make_shared<MessirLogger::FileTargetConfig>("FileTarget",	"", (std::string)CommonReg::Trace_path(), "",
+					0, 24, "_", ".json"),
+				},
+				{
+					{MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKind::KIND_ALL, {"MessirComm", "FileTarget"}},
+				}
+			);
+
+			this->Configure(default_config);
+			return;
+		}
+
+		std::string contents;
+		std::ifstream file(filename);
+		if (file.is_open()) {
+			while (getline(file, contents)) {
+				// std::cout << contents << '\n';
+			}
+		}
+		else {
+			// throw std::filesystem::filesystem_error("Failed to open file \"" + filename + "\"",
+			// 	std::make_error_code(std::errc::no_such_file_or_directory));
+			std::cout << "[WARNING] Load_config could not open config file \"" << filename << "\"" << std::endl;
+			return;
+		}
+		file.close();
+		JSONSerializer tmp_serializer;
+		tmp_serializer.m_json = nlohmann::json::parse(contents);
+		LoggerConfig config;
+		config.Deserialize(tmp_serializer);
+		this->Configure(config);
+	}
 }
-
-
