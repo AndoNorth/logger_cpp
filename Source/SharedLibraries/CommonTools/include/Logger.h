@@ -18,6 +18,7 @@
 #endif
 
 #include <SerializerJSON.h>
+#include <RegistrySettings.h>
 
 /**
  * macros for logging, example usage:
