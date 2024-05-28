@@ -7,17 +7,50 @@
 
 namespace MessirLogger {
 
-	// config
+	/**
+	 * Represents the configuration of a file logging target.
+	 */
 	class COMMONTOOLS_EXPORT FileTargetConfig : public TargetConfig {
 
-	public:
+	private:
+		/**
+		 * Path to log file.
+		 */
 		std::string _filepath;
+
+		/**
+		 * Name of log file.
+		 */
 		std::string _filename;
+
+		/**
+		 * Maximum size of log file.
+		 */
 		size_t _max_filesize = 0;
+
+		/**
+		 * Frequency of log rotation. This is used as a modulo on current hour.
+		 */
 		size_t _log_frequency = 24;
+
+		/**
+		 * Prefix of of filename.
+		 */
 		std::string _prefix;
+
+		/**
+		 * Suffix of filename.
+		 */
 		std::string _suffix;
+
+		/**
+		 * Format of filename.
+		 */
 		std::string _filename_format;
+
+		/**
+		 * time format in filename.
+		 */
 		std::string _filename_time_format;
 
 	public:
@@ -46,44 +79,126 @@ namespace MessirLogger {
 				)
 			);
 		}
+
+		friend class FileTarget;
 	};
 
-	// target
+	/**
+	 * Represents an instance of file logging target.
+	 */
 	class COMMONTOOLS_EXPORT FileTarget : public Target {
 
 	private:
-		std::string _filepath;
-		std::string _filename = "MSS_trace";
-		// 0, means unlimited filesize
-		size_t _max_filesize = 0;
 		/**
-		 * represents the frequency the log file should rollover in hours, from the start hour
-		 * should be <= 24, 0, disables this. e.g. 6 = { 00,06,12,18 }:00 = 00,06,12,18th hours.
-		 * rollsover automatically at midnight.
+		 * Path to log file.
+		 */
+		std::string _filepath;
+
+		/**
+		 * Log filename.
+		 */
+		std::string _filename = "MSS_trace";
+
+		/**
+		 * Max size of log file.
+		 * 0, means unlimited filesize.
+		 */
+		size_t _max_filesize = 0;
+
+		/**
+		 * Frequency the log file rotation. Used as a modulo on hour.
 		 */
 		size_t _log_frequency = 24;
+
+		/**
+		 * Prefix on log filename.
+		 */
 		std::string _prefix = "mss_logger";
+
+		/**
+		 * Suffix of log filename.
+		 */
 		std::string _suffix = ".log";
+
+		/**
+		 * Log filename format.
+		 */
 		std::string _filename_format = "%%path%%prefix_%%pid_%%filename_%%date_%%hour-%%min-%%sec-%%ms%%suffix";
 
+		/**
+		 * Current log filename. Changes on each log rotation.
+		 */
 		std::string _current_filename;
+
+		/**
+		 * Current hour retained by the log frequency.
+		 */
 		size_t _current_hour;
+
+		/**
+		 * Log file handle.
+		 */
 		std::ofstream _file;
 
 	private:
+		/**
+		 * Update the filename according to parameters.
+		 * 
+		 * @param time time of reference to generate the new filename
+		 */
 		void Update_filename(const std::chrono::time_point<std::chrono::system_clock>& time);
+
+		/**
+		 * Close file handle and re-open. Called when refreshing the target after failure.
+		 */
 		void Reopen_file();
 
 	protected:
+		/**
+		 * Update filename and refresh the target.
+		 */
 		void Setup() override;
+
+		/**
+		 * Check target and refresh or rotate if needed.
+		 */
 		void Maintenance() override;
+
+		/**
+		 * Load target config and apply to current target.
+		 * 
+		 * @param config given target config
+		 */
 		void Load_config(const TargetConfig& config) override;
+
+		/**
+		 * Export currently used config.
+		 * 
+		 * @return the exported target config
+		 */
 		std::shared_ptr<TargetConfig> Export_config() override;
+
+		/**
+		 * Refresh the target.
+		 */
 		void Refresh() override;
+
+		/**
+		 * Attempt to write the given log record.
+		 * 
+		 * @param record log record to be written
+		 * @return result letting caller know if the record was written successfully
+		 */
 		TargetResult Try_write_log(const LogRecord& record) override;
 
 	public:
+		/**
+		 * Gets the filename currently used by the target..
+		 * 
+		 * @return the current filename
+		 */
 		std::string Get_current_filename();
+
 		~FileTarget();
 	};
 }

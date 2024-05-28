@@ -20,12 +20,13 @@
 #include <SerializerJSON.h>
 #include <RegistrySettings.h>
 
-/**
- * macros for logging, example usage:
+/*
+ * Macros for logging, example usage:
  * MSS_DEBUG(LOG_TECHNICAL, "surpervision") << "This is my log message";
  * MSS_INFO_EXTRA("special_def", LOG_TECHNICAL, "surpervision") << "This is my log message";
  * MSS_WARNING(LOG_TECHNICAL, "surpervision").Format("format_str, %s, %d, %ld", arg1, arg2, arg3);
  */
+
 #define MSS_DEBUG(kind, entity) \
 	log_line(MessirLogger::LogLevel::LEVEL_DEBUG, kind, std::source_location::current(), entity, __logger)
 
@@ -71,19 +72,19 @@
 
 
 namespace MessirLogger {
-	// data structures
+	
 	/**
 	 * Represents the log level, used for filtering log records
 	 * based on severity, uses an order comparison.
 	 */
 	enum LogLevel {
-		LEVEL_DEBUG, /**< lowest level, used by developers for debug info */
-		LEVEL_INFO, /**< default level */
-		LEVEL_WARNING, /**< an error that is non critical */
-		LEVEL_ERROR,
-		LEVEL_CRITICAL, /**< used for critical feature errors */
-		LEVEL_FATAL, /**< used for system crashes */
-		LOG_LEVEL_COUNT, /**< used to track number of log levels */
+		LEVEL_DEBUG,     /**< lowest level, used by developers for debug info */
+		LEVEL_INFO,      /**< default level, just information */
+		LEVEL_WARNING,   /**< something went wrong or didn't work as expecting, but can be lived without */
+		LEVEL_ERROR,     /**< something couldn't be achieved */
+		LEVEL_CRITICAL,  /**< something went wrong with a critical feature of MSS (odb connection, saving message to ODB, loading from mem_messages, saving to mem_message, saving configuration) encountered an error */
+		LEVEL_FATAL,     /**< unrecoverable error, that triggers MSS shutdown or crash */
+		LOG_LEVEL_COUNT, /**< track number of log levels */
 	};
 
 	/**
@@ -94,14 +95,15 @@ namespace MessirLogger {
 	std::string Log_level_to_string(LogLevel level);
 
 	/**
-	 * Represents the log kind for distributing log records to targets which match.
+	 * Represents the log kind. This is used to define the log kind of a log entry, and the log kinds accepted by a given target.
+	 * Used to dispatch log records to targets which match.
 	 */
 	enum LogKind {
-		KIND_ALL, /**< default level */
-		KIND_TECHNICAL, /**< used for developer logs */
-		KIND_ACTION, /**< for filtering user actions */
-		KIND_EVENT, /**< for filtering events */
-		LOG_KIND_COUNT, /**< used to track number of log kinds */
+		KIND_ALL,       /**< covers all log kinds (log target filtering only) */
+		KIND_TECHNICAL, /**< technical-level logs */
+		KIND_ACTION,    /**< important user actions (configuration change, change-over, etc.) */
+		KIND_EVENT,     /**< events */
+		LOG_KIND_COUNT, /**< track number of log kinds */
 	};
 
 	/**
@@ -112,14 +114,37 @@ namespace MessirLogger {
 	std::string Log_kind_to_string(LogKind kind);
 
 	/**
-	 * Represents a log record, which has properties used to dispatch the log.
+	 * Represents a log record.
 	 */
 	struct LogRecord {
+		/**
+		 * Level of this record.
+		 */
 		LogLevel level = LogLevel::LEVEL_INFO;
+
+		/**
+		 * Log kind of this record.
+		 */
 		LogKind kind = LogKind::KIND_ALL;
+
+		/**
+		 * Soruce code location where the log was emitted, i.e. file/line.
+		 */
 		std::source_location source;
+
+		/**
+		 * Conceptual entity that emitted the log record.
+		 */
 		std::string source_entity;
+
+		/**
+		 * Content of the log record.
+		 */
 		std::string message;
+
+		/**
+		 * Time of emission of the log record.
+		 */
 		std::chrono::time_point<std::chrono::system_clock> timestamp;
 	};
 
@@ -129,20 +154,30 @@ namespace MessirLogger {
 	 * Represents the target type, used to create objects of targets.
 	 */
 	enum TargetType {
-		SYSTEM_OUT_TARGET, /**< target writes to std::cout */
-		SYSTEM_ERR_TARGET, /**< target writes to std::cerr */
-		FILE_TARGET, /**< target writes to file on local system */
-		LOG_TARGET_COUNT, /**< used to track number of log target types */
+		SYSTEM_OUT_TARGET, /**< target writes to standard output */
+		SYSTEM_ERR_TARGET, /**< target writes to standard error */
+		FILE_TARGET,       /**< target writes to file on local system */
+		LOG_TARGET_COUNT,  /**< track number of log target types */
 	};
 
 	/**
-	 * Represents a key-value pair, where key is [level, kind]
-	 * and value is [targets] which corresponds to target_names
-	 * used to generate dispatch key.
+	 * Represents a routing rule, for log records to log targets. This uses a mapping between 
+	 * a (level, kind) pair, and and set of targets identified by their name.
 	 */
 	struct COMMONTOOLS_EXPORT DispatchEntry : public JSONSerializable {
+		/**
+		 * Log level of this rule.
+		 */
 		LogLevel level;
+
+		/**
+		 * Log kind routed by this rule.
+		 */
 		LogKind kind;
+
+		/**
+		 * Targets to which the matched log records will be dispatched.
+		 */
 		std::set<std::string> targets;
 
 		DispatchEntry(const LogLevel& level = LogLevel::LEVEL_INFO, const LogKind& kind = LogKind::KIND_ALL, const std::set<std::string>& targets = {})
@@ -164,7 +199,7 @@ namespace MessirLogger {
 	COMMONTOOLS_EXPORT bool operator==(const DispatchEntry& lhs, const DispatchEntry& rhs);
 
 	/**
-	 * Represents the result of a write log attempt, used for debugging.
+	 * Represents the result of a write log attempt, used for keep track of error messages in case of failure.
 	 */
 	struct TargetResult {
 		bool success;
@@ -181,15 +216,26 @@ namespace MessirLogger {
 	COMMONTOOLS_EXPORT std::chrono::system_clock::time_point Convert_system_clock_to_UTC(
 		const std::chrono::time_point<std::chrono::system_clock>& time);
 
-	// config
 	/**
-	 * Base for target config, containing the minimum parameters.
+	 * Represents the configuration of a logging target. This is a base class and is meant to be overriden for each 
+	 * specific target implementation. E.g. MessirLogger::FileTargetConfig or MessirLogger::StandardOutputTarget.
 	 */
 	class COMMONTOOLS_EXPORT TargetConfig : public JSONSerializable {
 
 	public:
+		/**
+		 * Unique name of this target instance.
+		 */
 		std::string _target_name;
+
+		/**
+		 * Format string defining how log entries are written in the target.
+		 */
 		std::string _format_string;
+
+		/**
+		 * Identifies the type of the target (needed for deserialization).
+		 */
 		TargetType _target_type;
 
 	public:
@@ -198,7 +244,7 @@ namespace MessirLogger {
 
 		/**
 		 * Returns appropriate TargetConfig for specified TargetType, used by Deserialize
-		 * e.g. <MessirLogger::FileTargetConfig>
+		 * e.g. MessirLogger::FileTargetConfig
 		 * 
 		 * @param json object containing TargetConfig member variables
 		 * 
@@ -221,21 +267,40 @@ namespace MessirLogger {
 	COMMONTOOLS_EXPORT bool operator==(const TargetConfig& lhs, const TargetConfig& rhs);
 
 	/**
-	 * Config used to setup logger.
-	 * 
-	 * @param targets vector of pointers to TargetConfig's
-	 * @param dispatches vector of DispatchEntries which will be converted to DispatchKeys
-	 * @param use_fallback bool to control use of fallback log target, default = true
-	 * @param async_mode bool to toggle asynchronous logging mode, default = true
+	 * Represents the configuration of a logger instance.
 	 */
 	class COMMONTOOLS_EXPORT LoggerConfig : public JSONSerializable {
 
-	public:
+		/**
+		 * Configuration of logging targets.
+		 */
 		std::vector<std::shared_ptr<TargetConfig>> _target_configs;
+
+		/**
+		 * Log records routing rules.
+		 */
 		std::vector<DispatchEntry> _dispatch_config;
+
+		/**
+		 * True if we should use a fall back target if one fails.
+		 */
 		bool _use_fallback = true;
+
+		/**
+		 * True is this logger is asynchronous. This means log records are queued for being written to targets 
+		 * asynchronously.
+		 */
 		bool _asynchronous_mode = true;
 
+	public:
+		/**
+		 * Builds a configuration with passed parameters
+		 *
+		 * @param targets See LoggerConfig::_target_configs
+		 * @param dispatches See LoggerConfig::_dispatch_config
+		 * @param use_fallback See LoggerConfig::_use_fallback
+		 * @param async_mode See LoggerConfig::_asynchronous_mode
+		 */
 		LoggerConfig(const std::vector<std::shared_ptr<TargetConfig>>& targets = {}, 
 			const std::vector<DispatchEntry>& dispatches = {},
 			bool use_fallback = true,
@@ -254,11 +319,14 @@ namespace MessirLogger {
 				member("asynchronous_mode", &LoggerConfig::_asynchronous_mode, this)
 			);
 		}
+
+		friend COMMONTOOLS_EXPORT bool operator==(const LoggerConfig& lhs, const LoggerConfig& rhs);
+
+		friend class Logger;
 	};
 
 	COMMONTOOLS_EXPORT bool operator==(const LoggerConfig& lhs, const LoggerConfig& rhs);
 
-	// target
 	/**
 	 * Log target base class, used as a template for derived log target behaviour.
 	 */
@@ -275,32 +343,38 @@ namespace MessirLogger {
 		 * Method should be overridden, perform any setup required before enabling the target.
 		 */
 		virtual void Setup() = 0;
+
 		/**
 		 * Method should be overriden, perform the maintenance required by target if any.
 		 */
 		virtual void Maintenance() = 0;
+
 		/**
 		 * Method should be overriden, perform any cleanup and reenable the target.
 		 */
 		virtual void Refresh() = 0;
+
 		/**
 		 * Method should be overriden, attempt to write the log to target.
 		 * 
 		 * @param record LogRecord, to be written to target
 		 */
 		virtual TargetResult Try_write_log(const LogRecord& record) = 0;
+
 		/**
 		 * Method can be overriden, load config parameters into target.
 		 * 
 		 * @param config TargetConfig of appropriate TargetType e.g. FileTargetConfig->FileTarget
 		 */
 		virtual void Load_config(const TargetConfig& config);
+
 		/**
 		 * Method can be overriden, creates and returns a pointer of this target's configuration.
 		 * 
 		 * @return config TargetConfig pointer specific to this target's configuration
 		 */
 		virtual std::shared_ptr<TargetConfig> Export_config();
+
 		/**
 		 * Custom formatting of log message defined by _format_string.
 		 * 
@@ -309,6 +383,7 @@ namespace MessirLogger {
 		 * @return formatted_str formatted output
 		 */
 		std::string Format_log_message(const LogRecord& record);
+
 		/**
 		 * Custom formatting for time defined by _format_string.
 		 *
@@ -356,68 +431,155 @@ namespace MessirLogger {
 	 */
 	COMMONTOOLS_EXPORT std::shared_ptr<Target> New_log_target(TargetType target_type);
 
-	// logger
 	/**
-	 * Represents a key-value pair, where key is [level, kind]
-	 * and value is [targets], generated from dispatch key.
+	 * Represents a routing rule, for log records to log targets. This uses a mapping between 
+	 * a (level, kind) pair, and and set of targets.
 	 */
 	struct DispatchKey {
+		/**
+		 * Log level of this rule.
+		 */
 		LogLevel level;
+
+		/**
+		 * Log kind routed by this rule.
+		 */
 		LogKind kind;
+
+		/**
+		 * Targets to which the matched log records will be dispatched.
+		 */
 		std::set<std::shared_ptr<Target>> targets;
 	};
 
+	/**
+	 * Represents a logger instance.
+	 */
 	class COMMONTOOLS_EXPORT Logger {
 
 	private:
+		/**
+		 * Fallback logging target used when a target fails to write.
+		 */
 		std::shared_ptr<Target> _fallback_target;
+
+		/**
+		 * True if usage of fallback target is enabled.
+		 */
 		bool _use_fallback = true;
 
+		/**
+		 * Mutex to protect multithreaded access to logger.
+		 */
 		std::recursive_mutex _logger_mutex;
 
+		/**
+		 * Thread responsible for writing to targets, in case of asynchronous logging.
+		 */
 		std::jthread _logging_thread;
+
+		/**
+		 * Semaphore used to signal to _logging_thread that there are log records ready to be written.
+		 */
 		std::binary_semaphore _logging_smph {0};
+
+		/**
+		 * True if logging is asynchronous. This means log record are written asynchronously without blocking threads 
+		 * that add log records.
+		 */
 		bool _asynchronous_mode = true;
 
+		/**
+		 * Thread responsible for log rotations and refreshing targets in error state.
+		 */
 		std::jthread _maintenance_thread;
 
+		/**
+		 * Log targets.
+		 */
 		std::vector<std::shared_ptr<Target>> _targets;
+
+		/**
+		 * Routing rules.
+		 */
 		std::vector<DispatchKey> _dispatch_keys;
 
+		/**
+		 * Buffered log records waiting to be written to targets.
+		 */
 		std::vector<LogRecord> _log_records;
 
 	private:
+
+		/**
+		 * Initialize the logger, fallback configuration and targets.
+		 */
 		void Initialize();
 
-		void Manage_async(std::stop_token stop_token);
-		void Start_async_manager();
-		void Stop_async_manager();
 		/**
-		 * Handle for asynchronous logging, to be used by async thread.
+		 * Thread function for asynchronous writting log record to targets.
+		 * 
+		 * @param stop_token token used to signal termination to the thread
 		 */
-		void Handle_logs();
-
-		void Manage_maintenance(std::stop_token stop_token);
-		void Start_maintainer();
-		void Stop_maintainer();
-		/**
-		 * Handle for maintaining targets, to be used by maintenance thread.
-		 */
-		void Maintain_targets();
+		void Logging_thread(std::stop_token stop_token);
 
 		/**
-		 * Dispatch log record and write to appropriate targets.
+		 * Start the logging thread.
+		 */
+		void Start_logging_thread();
+
+		/**
+		 * Stop the logging thread.
+		 */
+		void Stop_logging_thread();
+
+		/**
+		 * Consume awaiting log records and write them to corresponding targets, according to routing rules (dispatch keys).
+		 */
+		void Process_logs();
+
+		/**
+		 * Thread function for maintaining log targets' state.
+		 * 
+		 * @param stop_token token used to signal termination to the thread
+		 */
+		void Maintenance_thread(std::stop_token stop_token);
+
+		/**
+		 * Start maintenance thread.
+		 */
+		void Start_maintainance_thread();
+
+		/**
+		 * Stop maintenance thread.
+		 */
+		void Stop_maintainance_thread();
+
+		/**
+		 * Dispatch given log record and write to appropriate targets.
 		 *
-		 * @param record
+		 * @param record log record to be dispatched
 		 */
 		void Write_log(const LogRecord& record);
 
 	public:
 		~Logger();
 
+		/**
+		 * Start the logger.
+		 */
 		void Start();
+
+		/**
+		 * Stop the logger.
+		 */
 		void Stop();
 
+		/**
+		 * Get the logger configuration (for serialization).
+		 * 
+		 * @return the logger config
+		 */
 		LoggerConfig Get_config();
 
 		/**
@@ -428,26 +590,28 @@ namespace MessirLogger {
 		void Configure(const LoggerConfig& config);
 
 		/**
-		 * Interface to add targets.
+		 * Add given target to the list of available targets
+		 * 
+		 * @param target target to append to targets list
 		 */
 		void Add_target(std::shared_ptr<Target> target);
 
 		/**
-		 * Reconfigure logger, stops and starts with the input configuration.
+		 * Reconfigure logger. This preemptively stops the logger, and restarts after applying the new configuration.
 		 * 
 		 * @param config LoggerConfig used to reconfigure logger
 		 */
 		void Reconfigure(const LoggerConfig& config);
 
 		/**
-		 * API for logging.
+		 * Append a log record to be written to matching targets.
 		 * 
 		 * @param record LogRecord to be written
 		 */
 		void Log_entry(LogRecord record);
 
 		/**
-		 * API for logging.
+		 * Append a log record to be written to matching targets.
 		 * 
 		 * @param level log level, used for dispatch
 		 * @param kind log type, used for dispatch e.g. TECHNICAL = for developers
@@ -478,26 +642,49 @@ namespace MessirLogger {
 }
 
 /**
- * singleton of __logger to be referenced by other modules.
+ * singleton of default logger instance.
  */
 extern COMMONTOOLS_EXPORT MessirLogger::Logger __logger;
 
-/**
- * this is required to solve a LINK error,
- * we cannot directly use COMMONTOOLS_EXPORT for std::stringstream.
+/*
+ * Ugly trick to solve a link error: we cannot directly use COMMONTOOLS_EXPORT class inheriting std::stringstream.
  */
 class log_line_linking_stub : public std::stringstream {};
 
 /**
- * wrapper for convenient logging.
+ * Wrapper for convenient logging. See MSS_* macros.
  */
 class COMMONTOOLS_EXPORT log_line : public log_line_linking_stub {
 
-public:
+private:
+	/**
+	 * Level of this record.
+	 */
 	MessirLogger::LogLevel level;
+
+	/**
+	 * Log kind of this record.
+	 */
 	MessirLogger::LogKind kind;
-	std::string _entity;
+
+	/**
+	 * Soruce code location where the log was emitted, i.e. file/line.
+	 */
 	std::source_location _source;
+
+	/**
+	 * Conceptual entity that emitted the log record.
+	 */
+	std::string _entity;
+
+	/**
+	 * Content of the log record.
+	 */
+	std::string message;
+	
+	/**
+	 * Logger instance to which this entry will be added.
+	 */
 	MessirLogger::Logger& _logger;
 
 public:
@@ -507,16 +694,15 @@ public:
 		_entity(entity), _logger(logger)
 	{}
 
-	~log_line() {
-		_logger.Log_entry(level, kind, this->str(), _source, _entity);
-	}
+	/**
+	 * Log record is effectively added to logger on destruction.
+	 */
+	~log_line();
 
-	void Format(const char* format, ...) {
-		va_list arguments;
-		va_start(arguments, format);
-		char trace_text[800];
-		int  text_length = vsnprintf(trace_text, sizeof(trace_text) - 1, format, arguments);
-		va_end(arguments);
-		this->write(trace_text, text_length);
-	}
+	/**
+	 * Formats the message strings according to given format string.
+	 * 
+	 * @param format format string
+	 */
+	void Format(const char* format, ...);
 };

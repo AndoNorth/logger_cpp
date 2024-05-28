@@ -308,7 +308,6 @@ namespace MessirLogger {
 		}
 	}
 
-	// logger
 	Logger::~Logger() { this->Stop(); }
 
 	void Logger::Initialize() {
@@ -327,26 +326,26 @@ namespace MessirLogger {
 		}
 	}
 
-	void Logger::Manage_async(std::stop_token stop_token) {
+	void Logger::Logging_thread(std::stop_token stop_token) {
 
 		while (!stop_token.stop_requested()) {
 
 			bool clean_release = _logging_smph.try_acquire_for(std::chrono::seconds(2));
-			this->Handle_logs();
+			this->Process_logs();
 		}
 	}
 
-	void Logger::Start_async_manager() {
+	void Logger::Start_logging_thread() {
 		if (!this->_asynchronous_mode) {
 			return;
 		}
 
 		if (!_logging_thread.joinable()) {
-			_logging_thread = std::jthread([this](std::stop_token stop_token) { Manage_async(stop_token); });
+			_logging_thread = std::jthread([this](std::stop_token stop_token) { Logging_thread(stop_token); });
 		}
 	}
 
-	void Logger::Stop_async_manager() {
+	void Logger::Stop_logging_thread() {
 
 		if (_logging_thread.joinable()) {
 			_logging_thread.request_stop();
@@ -354,34 +353,31 @@ namespace MessirLogger {
 		}
 	}
 
-	void Logger::Manage_maintenance(std::stop_token stop_token) {
+	void Logger::Maintenance_thread(std::stop_token stop_token) {
 
 		while (!stop_token.stop_requested()) {
 
-			this->Maintain_targets();
+			// Call maintenance method for each target. May trigger log rotation or refresh the target in case of failure
+			for (const std::shared_ptr<Target>& target : _targets) {
+				target->Perform_maintenance();
+			}
+			
 			std::this_thread::sleep_for(std::chrono::seconds(10));
 		}
 	}
 
-	void Logger::Start_maintainer() {
+	void Logger::Start_maintainance_thread() {
 
 		if (!_maintenance_thread.joinable()) {
-			_maintenance_thread = std::jthread([this](std::stop_token stop_token) { Manage_maintenance(stop_token); });
+			_maintenance_thread = std::jthread([this](std::stop_token stop_token) { Maintenance_thread(stop_token); });
 		}
 	}
 
-	void Logger::Stop_maintainer() {
+	void Logger::Stop_maintainance_thread() {
 
 		if (_maintenance_thread.joinable()) {
 			_maintenance_thread.request_stop();
 			_maintenance_thread.join();
-		}
-	}
-
-	void Logger::Maintain_targets() {
-
-		for (const std::shared_ptr<Target>& target : _targets) {
-			target->Perform_maintenance();
 		}
 	}
 
@@ -390,18 +386,18 @@ namespace MessirLogger {
 		std::unique_lock<std::recursive_mutex> logger_lock(_logger_mutex);
 
 		this->Initialize();
-		this->Start_async_manager();
-		this->Start_maintainer();
+		this->Start_logging_thread();
+		this->Start_maintainance_thread();
 	}
 
 	void Logger::Stop() {
 
 		std::unique_lock<std::recursive_mutex> logger_lock(_logger_mutex);
 
-		this->Stop_async_manager();
-		this->Stop_maintainer();
+		this->Stop_logging_thread();
+		this->Stop_maintainance_thread();
 		// consume any remaining log records
-		this->Handle_logs();
+		this->Process_logs();
 	}
 
 	void Logger::Write_log(const LogRecord& record) {
@@ -435,7 +431,7 @@ namespace MessirLogger {
 		}
 	}
 
-	void Logger::Handle_logs() {
+	void Logger::Process_logs() {
 
 		std::vector<LogRecord> tmp_records;
 
@@ -642,4 +638,17 @@ namespace MessirLogger {
 		config.Deserialize(tmp_serializer);
 		this->Configure(config);
 	}
+} // namespace MessirLogger
+
+log_line::~log_line() {
+	_logger.Log_entry(level, kind, this->str(), _source, _entity);
+}
+
+void log_line::Format(const char* format, ...) {
+	va_list arguments;
+	va_start(arguments, format);
+	char trace_text[800];
+	int  text_length = vsnprintf(trace_text, sizeof(trace_text) - 1, format, arguments);
+	va_end(arguments);
+	this->write(trace_text, text_length);
 }
