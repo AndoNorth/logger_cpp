@@ -20,7 +20,7 @@ static void BM_Trace(benchmark::State& state) {
 	// while(state.keeprunning())
 	for (auto _ : state) {
 		for (int i = 0; i < state.range(0); i++) {
-			trace_ << "log message " + std::to_string(i);
+			//trace_ << "log message " + std::to_string(i);
 			//benchmark::ClobberMemory();
 		}
 	}
