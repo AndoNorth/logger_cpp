@@ -10,18 +10,31 @@
 namespace MessirLogger {
 
 	// config
-	FileTargetConfig::FileTargetConfig(const std::string& name, const std::string& format,
-		const std::string& filepath, const std::string& filename,
-		const size_t& max_filesize, const size_t& log_period,
-		const std::string& prefix, const std::string& suffix,
-		const std::string& filename_format,
-		const std::string& filename_time_format) :
-		TargetConfig(name, format, TargetType::FILE_TARGET),
-		_filepath(filepath), _filename(filename),
-		_max_filesize(max_filesize), _log_frequency(log_period),
-		_prefix(prefix), _suffix(suffix),
-		_filename_format(filename_format),
-		_filename_time_format(filename_time_format)	{}
+	FileTargetConfig::FileTargetConfig(const std::string& name, const std::string& format, const std::string& filepath, 
+		const std::string& filename, const size_t& max_filesize, const size_t& log_period, const std::string& prefix,
+		const std::string& suffix, const std::string& filename_format) 
+		: TargetConfig(name, format, TargetType::FILE_TARGET),
+		_filename(filename), _max_filesize(max_filesize), _log_frequency(log_period),
+		_filename_format(filename_format)
+	{
+		// Set only if value is provided, otherwise, leave the default values
+
+		if (!filepath.empty()) {
+			_filepath = filepath;
+		}
+
+		if (!prefix.empty()) {
+			_prefix = prefix;
+		}
+
+		if (!suffix.empty()) {
+			_suffix = suffix;
+		}
+
+		if (!filename_format.empty()) {
+			_filename_format = filename_format;
+		}
+	}
 
 	void FileTargetConfig::Serialize(JSONSerializer& serializer) {
 		serializer << *this;
@@ -41,6 +54,7 @@ namespace MessirLogger {
 			{ "%%path", _filepath },
 			{ "%%prefix", _prefix },
 			{ "%%filename", _filename },
+			{ "%%title", (LPCTSTR)MessirReg::Get_string(comm_menu_key, "Title")},
 			{ "%%suffix", _suffix },
 			{ "%%pid", std::to_string(::Get_current_pid())} // from CommonToolsMisc.cpp
 		};
@@ -55,7 +69,7 @@ namespace MessirLogger {
 		formatted_filename = this->Target::Format_time(formatted_filename, time);
 
 		if (!_current_filename.empty()) {
-			this->Write_log(LogRecord(MessirLogger::LogLevel::LEVEL_DEBUG, MessirLogger::LogKind::KIND_TECHNICAL, std::source_location::current(), "",
+			this->Write_log(LogRecord(MessirLogger::LogLevel::LEVEL_DEBUG, MessirLogger::LogKind::KIND_TECHNICAL, MSS_MODULE_NAME, std::source_location::current(), "",
 				"Transferring to new log file" + formatted_filename));
 		}
 
@@ -116,13 +130,13 @@ namespace MessirLogger {
 
 		const FileTargetConfig& file_config = static_cast<const FileTargetConfig&>(config);
 		_filepath = file_config._filepath;
-		_filename = file_config._filename.length() > 0 ? file_config._filename : _filename;
+		_filename = file_config._filename.empty() ? _filename : file_config._filename;
 		_max_filesize = file_config._max_filesize;
 		_log_frequency = file_config._log_frequency;
-		_prefix = file_config._prefix.length() > 0 ? file_config._prefix : _prefix;
-		_suffix = file_config._suffix.length() > 0 ? file_config._suffix : _suffix;
-		_filename_format = file_config._filename_format.length() > 0 ?
-			file_config._filename_format : _filename_format;
+		_prefix = file_config._prefix.empty() ? _prefix : file_config._prefix;
+		_suffix = file_config._suffix.empty() ? _suffix : file_config._suffix;
+		_filename_format = file_config._filename_format.empty() ?
+			_filename_format : file_config._filename_format;
 
 		this->Target::Load_config(config);
 	}
@@ -144,6 +158,10 @@ namespace MessirLogger {
 	TargetResult FileTarget::Try_write_log(const LogRecord& record) {
 
 		TargetResult result(true);
+
+		if (!_file.is_open()) {
+			this->Reopen_file();
+		}
 
 		if (!_file.is_open()) {
 			result.success = false;

@@ -16,7 +16,10 @@ namespace MessirLogger {
 
 		std::string formatted_message = this->Format_log_message(record);
 		std::cout << formatted_message << std::endl;
-
+#ifdef _WINDOWS
+		// Allows to get output in VS output windows when debugging
+		::OutputDebugStringA((formatted_message + "\n").c_str());
+#endif
 		return result;
 	}
 }

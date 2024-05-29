@@ -132,7 +132,7 @@ void Logger_Write_log(benchmark::State& state, MessirLogger::Logger* logger) {
 		for (int i = 0; i < state.range(0); i++) {
 			MessirLogger::LogRecord test_record = MessirLogger::LogRecord(
 				MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKind::KIND_ALL,
-				std::source_location::current(), "",
+				MSS_MODULE_NAME, std::source_location::current(), "",
 				"log message " + std::to_string(i));
 			logger->Log_entry(test_record);
 			benchmark::ClobberMemory();

@@ -622,7 +622,7 @@ TEST_F(Logger_dispatch_tests, Dispatch_level_DEBUG_test) {
 
 	MessirLogger::LogRecord test_record = MessirLogger::LogRecord(
 		MessirLogger::LogLevel::LEVEL_DEBUG, MessirLogger::LogKind::KIND_ALL,
-		std::source_location::current(), "",
+		MSS_MODULE_NAME, std::source_location::current(), "",
 		"log message");
 	logger->Log_entry(test_record);
 
@@ -638,7 +638,7 @@ TEST_F(Logger_dispatch_tests, Dispatch_level_INFO_test) {
 
 	MessirLogger::LogRecord test_record = MessirLogger::LogRecord(
 		MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKind::KIND_ALL,
-		std::source_location::current(), "",
+		MSS_MODULE_NAME, std::source_location::current(), "",
 		"log message");
 	logger->Log_entry(test_record);
 
@@ -654,7 +654,7 @@ TEST_F(Logger_dispatch_tests, Dispatch_level_WARNING_test) {
 
 	MessirLogger::LogRecord test_record = MessirLogger::LogRecord(
 		MessirLogger::LogLevel::LEVEL_WARNING, MessirLogger::LogKind::KIND_ALL,
-		std::source_location::current(), "",
+		MSS_MODULE_NAME, std::source_location::current(), "",
 		"log message");
 	logger->Log_entry(test_record);
 
@@ -670,7 +670,7 @@ TEST_F(Logger_dispatch_tests, Dispatch_level_ERROR_test) {
 
 	MessirLogger::LogRecord test_record = MessirLogger::LogRecord(
 		MessirLogger::LogLevel::LEVEL_ERROR, MessirLogger::LogKind::KIND_ALL,
-		std::source_location::current(), "",
+		MSS_MODULE_NAME, std::source_location::current(), "",
 		"log message");
 	logger->Log_entry(test_record);
 
@@ -686,7 +686,7 @@ TEST_F(Logger_dispatch_tests, Dispatch_level_CRITICAL_test) {
 
 	MessirLogger::LogRecord test_record = MessirLogger::LogRecord(
 		MessirLogger::LogLevel::LEVEL_CRITICAL, MessirLogger::LogKind::KIND_ALL,
-		std::source_location::current(), "",
+		MSS_MODULE_NAME, std::source_location::current(), "",
 		"log message");
 	logger->Log_entry(test_record);
 
@@ -702,7 +702,7 @@ TEST_F(Logger_dispatch_tests, Dispatch_level_FATAL_test) {
 
 	MessirLogger::LogRecord test_record = MessirLogger::LogRecord(
 		MessirLogger::LogLevel::LEVEL_FATAL, MessirLogger::LogKind::KIND_ALL,
-		std::source_location::current(), "",
+		MSS_MODULE_NAME, std::source_location::current(), "",
 		"log message");
 	logger->Log_entry(test_record);
 
@@ -718,7 +718,7 @@ TEST_F(Logger_dispatch_tests, Dispatch_kind_TECHNICAL_test) {
 
 	MessirLogger::LogRecord test_record = MessirLogger::LogRecord(
 		MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKind::KIND_TECHNICAL,
-		std::source_location::current(), "",
+		MSS_MODULE_NAME, std::source_location::current(), "",
 		"log message");
 	logger->Log_entry(test_record);
 
@@ -732,7 +732,7 @@ TEST_F(Logger_dispatch_tests, Dispatch_kind_ACTION_test) {
 
 	MessirLogger::LogRecord test_record = MessirLogger::LogRecord(
 		MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKind::KIND_ACTION,
-		std::source_location::current(), "",
+		MSS_MODULE_NAME, std::source_location::current(), "",
 		"log message");
 	logger->Log_entry(test_record);
 
@@ -746,7 +746,7 @@ TEST_F(Logger_dispatch_tests, Dispatch_kind_EVENT_test) {
 
 	MessirLogger::LogRecord test_record = MessirLogger::LogRecord(
 		MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKind::KIND_EVENT,
-		std::source_location::current(), "",
+		MSS_MODULE_NAME, std::source_location::current(), "",
 		"log message");
 	logger->Log_entry(test_record);
 
@@ -794,7 +794,7 @@ TEST_F(File_target_tests, FileTarget_test) {
 
 	MessirLogger::LogRecord test_record = MessirLogger::LogRecord(
 		MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKind::KIND_ALL,
-		std::source_location::current(), "",
+		MSS_MODULE_NAME, std::source_location::current(), "",
 		"log message");
 
 	bool file_exists = std::filesystem::exists(expected_file_name);
@@ -891,11 +891,11 @@ TEST_F(Logger_async_tests, Async_test) {
 
 	MessirLogger::LogRecord test_record1 = MessirLogger::LogRecord(
 		MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKind::KIND_ALL,
-		std::source_location::current(), "",
+		MSS_MODULE_NAME, std::source_location::current(), "",
 		"log message");
 	MessirLogger::LogRecord test_record2 = MessirLogger::LogRecord(
 		MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKind::KIND_ALL,
-		std::source_location::current(), "",
+		MSS_MODULE_NAME, std::source_location::current(), "",
 		"log message");
 
 	logger->Log_entry(test_record1);
