@@ -14,8 +14,7 @@ namespace MessirLogger {
 		const std::string& filename, const size_t& max_filesize, const size_t& log_period, const std::string& prefix,
 		const std::string& suffix, const std::string& filename_format) 
 		: TargetConfig(name, format, TargetType::FILE_TARGET),
-		_filename(filename), _max_filesize(max_filesize), _log_frequency(log_period),
-		_filename_format(filename_format)
+		_filename(filename), _max_filesize(max_filesize), _log_frequency(log_period)
 	{
 		// Set only if value is provided, otherwise, leave the default values
 

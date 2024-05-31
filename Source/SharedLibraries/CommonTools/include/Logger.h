@@ -236,7 +236,7 @@ namespace MessirLogger {
 		/**
 		 * Format string defining how log entries are written in the target.
 		 */
-		std::string _format_string = "%%monstr %%day %%hour:%%min:%%sec.%%ms [%%source:%%line] [%%level:%%kind] [%%module:%%entity] - %%log";
+		std::string _format_string = "%%monstr %%day %%hour:%%min:%%sec.%%ms [%%source:%%line] [%%level:%%kind] [%%module:%%entity] %%log";
 
 		/**
 		 * Identifies the type of the target (needed for deserialization).
@@ -342,7 +342,7 @@ namespace MessirLogger {
 	protected:
 		std::string _target_name;
 		std::string _format_string =
-			"%%monstr %%day %%hour:%%min:%%sec.%%ms [%%source:%%line] [%%level:%%kind] [%%module:%%entity] - %%log";
+			"%%monstr %%day %%hour:%%min:%%sec.%%ms [%%source:%%line] [%%level:%%kind] [%%module:%%entity] %%log";
 		TargetType _target_type;
 
 	protected:
