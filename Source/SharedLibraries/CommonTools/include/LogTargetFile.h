@@ -16,7 +16,7 @@ namespace MessirLogger {
 		/**
 		 * Path to log file.
 		 */
-		std::string _filepath;
+		std::string _filepath = (LPCTSTR)CommonReg::Trace_path();
 
 		/**
 		 * Name of log file.
@@ -41,25 +41,23 @@ namespace MessirLogger {
 		/**
 		 * Suffix of filename.
 		 */
-		std::string _suffix;
+		std::string _suffix = ".log";
 
 		/**
 		 * Format of filename.
 		 */
-		std::string _filename_format;
-
-		/**
-		 * time format in filename.
-		 */
-		std::string _filename_time_format;
+		std::string _filename_format = "%%path%%prefix%%filename%%title_%%date_%%hour-%%min-%%sec-%%ms_%%pid%%suffix";
 
 	public:
-		FileTargetConfig(const std::string& name = "undefined", const std::string& format = "",
-			const std::string& filepath = "", const std::string& filename = "",
-			const size_t& max_filesize = 0, const size_t& _log_frequency = 24,
-			const std::string& prefix = "", const std::string& suffix = "",
-			const std::string& filename_format = "",
-			const std::string& filename_time_format = "");
+		FileTargetConfig(const std::string& name = "undefined", 
+			const std::string& format = "",
+			const std::string& filepath = "",
+			const std::string& filename = "",
+			const size_t& max_filesize = 0,
+			const size_t& _log_frequency = 24,
+			const std::string& prefix = "",
+			const std::string& suffix = "",
+			const std::string& filename_format = "");
 
 		virtual void Serialize(JSONSerializer& serializer) override;
 		virtual void Deserialize(JSONSerializer& serializer) override;
@@ -74,8 +72,7 @@ namespace MessirLogger {
 					member("log_frequency", &FileTargetConfig::_log_frequency, this),
 					member("prefix", &FileTargetConfig::_prefix, this),
 					member("suffix", &FileTargetConfig::_suffix, this),
-					member("filename_format", &FileTargetConfig::_filename_format, this),
-					member("filename_time_format", &FileTargetConfig::_filename_time_format, this)
+					member("filename_format", &FileTargetConfig::_filename_format, this)
 				)
 			);
 		}
@@ -92,12 +89,12 @@ namespace MessirLogger {
 		/**
 		 * Path to log file.
 		 */
-		std::string _filepath;
+		std::string _filepath = (LPCTSTR)CommonReg::Trace_path();
 
 		/**
 		 * Log filename.
 		 */
-		std::string _filename = "MSS_trace";
+		std::string _filename;
 
 		/**
 		 * Max size of log file.
@@ -113,7 +110,7 @@ namespace MessirLogger {
 		/**
 		 * Prefix on log filename.
 		 */
-		std::string _prefix = "mss_logger";
+		std::string _prefix;
 
 		/**
 		 * Suffix of log filename.
@@ -123,7 +120,7 @@ namespace MessirLogger {
 		/**
 		 * Log filename format.
 		 */
-		std::string _filename_format = "%%path%%prefix_%%pid_%%filename_%%date_%%hour-%%min-%%sec-%%ms%%suffix";
+		std::string _filename_format = "%%path%%prefix%%filename%%title_%%date_%%hour-%%min-%%sec-%%ms_%%pid%%suffix";
 
 		/**
 		 * Current log filename. Changes on each log rotation.

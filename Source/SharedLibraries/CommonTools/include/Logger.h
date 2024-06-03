@@ -28,47 +28,47 @@
  */
 
 #define MSS_DEBUG(kind, entity) \
-	log_line(MessirLogger::LogLevel::LEVEL_DEBUG, kind, std::source_location::current(), entity, __logger)
+	log_line(MessirLogger::LogLevel::LEVEL_DEBUG, kind, MSS_MODULE_NAME, std::source_location::current(), entity, __logger)
 
 #define MSS_INFO(kind, entity) \
-	log_line(MessirLogger::LogLevel::LEVEL_INFO, kind, std::source_location::current(), entity, __logger)
+	log_line(MessirLogger::LogLevel::LEVEL_INFO, kind, MSS_MODULE_NAME, std::source_location::current(), entity, __logger)
 
 #define MSS_WARNING(kind, entity) \
-	log_line(MessirLogger::LogLevel::LEVEL_WARNING, kind, std::source_location::current(), entity, __logger)
+	log_line(MessirLogger::LogLevel::LEVEL_WARNING, kind, MSS_MODULE_NAME, std::source_location::current(), entity, __logger)
 
 #define MSS_ERROR(kind, entity) \
-	log_line(MessirLogger::LogLevel::LEVEL_ERROR, kind, std::source_location::current(), entity, __logger)
+	log_line(MessirLogger::LogLevel::LEVEL_ERROR, kind, MSS_MODULE_NAME, std::source_location::current(), entity, __logger)
 
 #define MSS_CRITICAL(kind, entity) \
-	log_line(MessirLogger::LogLevel::LEVEL_CRITICAL, kind, std::source_location::current(), entity, __logger)
+	log_line(MessirLogger::LogLevel::LEVEL_CRITICAL, kind, MSS_MODULE_NAME, std::source_location::current(), entity, __logger)
 
 #define MSS_FATAL(kind, entity) \
-	log_line(MessirLogger::LogLevel::LEVEL_FATAL, kind, std::source_location::current(), entity, __logger)
+	log_line(MessirLogger::LogLevel::LEVEL_FATAL, kind, MSS_MODULE_NAME, std::source_location::current(), entity, __logger)
 
 
 #define MSS_DEBUG_EXTRA(extra_str, kind, entity) \
 	if (global_config.Active(extra_str)) \
-		log_line(MessirLogger::LogLevel::LEVEL_DEBUG, kind, std::source_location::current(), entity, __logger)
+		log_line(MessirLogger::LogLevel::LEVEL_DEBUG, kind, MSS_MODULE_NAME, std::source_location::current(), entity, __logger)
 
 #define MSS_INFO_EXTRA(extra_str, kind, entity) \
 	if (global_config.Active(extra_str)) \
-		log_line(MessirLogger::LogLevel::LEVEL_INFO, kind, std::source_location::current(), entity, __logger)
+		log_line(MessirLogger::LogLevel::LEVEL_INFO, kind, MSS_MODULE_NAME, std::source_location::current(), entity, __logger)
 
 #define MSS_WARNING_EXTRA(extra_str, kind, entity) \
 	if (global_config.Active(extra_str)) \
-		log_line(MessirLogger::LogLevel::LEVEL_WARNING, kind, std::source_location::current(), entity, __logger)
+		log_line(MessirLogger::LogLevel::LEVEL_WARNING, kind, MSS_MODULE_NAME, std::source_location::current(), entity, __logger)
 
 #define MSS_ERROR_EXTRA(extra_str, kind, entity) \
 	if (global_config.Active(extra_str)) \
-		log_line(MessirLogger::LogLevel::LEVEL_ERROR, kind, std::source_location::current(), entity, __logger)
+		log_line(MessirLogger::LogLevel::LEVEL_ERROR, kind, MSS_MODULE_NAME, std::source_location::current(), entity, __logger)
 
 #define MSS_CRITICAL_EXTRA(extra_str, kind, entity) \
 	if (global_config.Active(extra_str)) \
-		log_line(MessirLogger::LogLevel::LEVEL_CRITICAL, kind, std::source_location::current(), entity, __logger)
+		log_line(MessirLogger::LogLevel::LEVEL_CRITICAL, kind, MSS_MODULE_NAME, std::source_location::current(), entity, __logger)
 
 #define MSS_FATAL_EXTRA(extra_str, kind, entity) \
 	if (global_config.Active(extra_str)) \
-		log_line(MessirLogger::LogLevel::LEVEL_FATAL, kind, std::source_location::current(), entity, __logger)
+		log_line(MessirLogger::LogLevel::LEVEL_FATAL, kind, MSS_MODULE_NAME, std::source_location::current(), entity, __logger)
 
 
 namespace MessirLogger {
@@ -126,6 +126,11 @@ namespace MessirLogger {
 		 * Log kind of this record.
 		 */
 		LogKind kind = LogKind::KIND_ALL;
+
+		/**
+		 * Name of the module that emitted the log record.
+		 */
+		std::string module_name;
 
 		/**
 		 * Soruce code location where the log was emitted, i.e. file/line.
@@ -231,7 +236,7 @@ namespace MessirLogger {
 		/**
 		 * Format string defining how log entries are written in the target.
 		 */
-		std::string _format_string;
+		std::string _format_string = "%%monstr %%day %%hour:%%min:%%sec.%%ms [%%source:%%line] [%%level:%%kind] [%%module:%%entity] %%log";
 
 		/**
 		 * Identifies the type of the target (needed for deserialization).
@@ -239,7 +244,9 @@ namespace MessirLogger {
 		TargetType _target_type;
 
 	public:
-		TargetConfig(const std::string& name = "unnamed", const std::string& format = "%%time [%%level] - %%log", TargetType type = LOG_TARGET_COUNT);
+		TargetConfig(const std::string& name = "unnamed",
+			const std::string& format = "",
+			TargetType type = LOG_TARGET_COUNT);
 		~TargetConfig();
 
 		/**
@@ -335,7 +342,7 @@ namespace MessirLogger {
 	protected:
 		std::string _target_name;
 		std::string _format_string =
-			"%%monstr %%day %%hour:%%min:%%sec.%%ms [%%source:%%line] [%%level:%%kind] [%%entity] - %%log";
+			"%%monstr %%day %%hour:%%min:%%sec.%%ms [%%source:%%line] [%%level:%%kind] [%%module:%%entity] %%log";
 		TargetType _target_type;
 
 	protected:
@@ -615,12 +622,13 @@ namespace MessirLogger {
 		 * 
 		 * @param level log level, used for dispatch
 		 * @param kind log type, used for dispatch e.g. TECHNICAL = for developers
-		 * @param log_message
-		 * @param source
+		 * @param log_message message content of the entry
+		 * @param module_name name of the module taht emitted the log record
 		 * @param source_entity default value of "", corresponds to context of log
 		 */
 		void Log_entry(LogLevel log_level, LogKind log_kind,
 			std::string log_message,
+			std::string module_name,
 			std::source_location source,
 			std::string source_entity = "");
 
@@ -660,12 +668,17 @@ private:
 	/**
 	 * Level of this record.
 	 */
-	MessirLogger::LogLevel level;
+	MessirLogger::LogLevel _level;
 
 	/**
 	 * Log kind of this record.
 	 */
-	MessirLogger::LogKind kind;
+	MessirLogger::LogKind _kind;
+
+	/**
+	 * Name of the module that emitted the log record.
+	 */
+	std::string _module_name;
 
 	/**
 	 * Soruce code location where the log was emitted, i.e. file/line.
@@ -680,7 +693,7 @@ private:
 	/**
 	 * Content of the log record.
 	 */
-	std::string message;
+	std::string _message;
 	
 	/**
 	 * Logger instance to which this entry will be added.
@@ -689,8 +702,8 @@ private:
 
 public:
 	log_line(MessirLogger::LogLevel level, MessirLogger::LogKind kind,
-		std::source_location source, std::string entity, MessirLogger::Logger& logger)
-		: level(level), kind(kind), _source(source),
+		std::string module_name, std::source_location source, std::string entity, MessirLogger::Logger& logger)
+		: _level(level), _kind(kind), _module_name(module_name), _source(source),
 		_entity(entity), _logger(logger)
 	{}
 

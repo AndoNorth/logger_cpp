@@ -40,6 +40,7 @@ namespace MessirLogger {
 	bool operator==(const LogRecord& lhs, const LogRecord& rhs) {
 		return lhs.level == rhs.level &&
 			lhs.kind == rhs.kind &&
+			lhs.module_name == rhs.module_name &&
 			lhs.source.file_name() == rhs.source.file_name() &&
 			lhs.source.line() == rhs.source.line() &&
 			lhs.source_entity == rhs.source_entity &&
@@ -64,7 +65,12 @@ namespace MessirLogger {
 
 	// config
 	TargetConfig::TargetConfig(const std::string& name, const std::string& format, TargetType type)
-		: _target_name(name), _format_string(format), _target_type(type) {}
+		: _target_name(name), _target_type(type)
+	{
+		if (!format.empty()) {
+			_format_string = format;
+		}
+	}
 
 	TargetConfig::~TargetConfig() = default;
 
@@ -162,6 +168,7 @@ namespace MessirLogger {
 		const std::unordered_map<std::string, std::string> replacements {
 			{ "%%level", Log_level_to_string(record.level) },
 			{ "%%kind",  Log_kind_to_string(record.kind) },
+			{ "%%module",  record.module_name },
 			{ "%%source",  [&]() {
 				std::string fullpath = record.source.file_name();
 				size_t pos = fullpath.find_last_of("/\\");
@@ -315,7 +322,7 @@ namespace MessirLogger {
 		if (_use_fallback && !_fallback_target) {
 			std::shared_ptr<TargetConfig> fallback_config =
 				std::make_shared<FileTargetConfig>("MessirComm", "", "", "FallbackLog",
-					0, 0, "", "", "", "");
+					0, 0);
 			_fallback_target = New_log_target(fallback_config->_target_type);
 			_fallback_target->Configure(*fallback_config);
 			_fallback_target->Initialize();
@@ -568,17 +575,17 @@ namespace MessirLogger {
 		}
 	}
 
-	void Logger::Log_entry(LogLevel log_level, LogKind log_kind,
-		std::string log_message, std::source_location source, std::string source_entity)
+	void Logger::Log_entry(LogLevel log_level, LogKind log_kind, std::string log_message,
+		std::string module_name, std::source_location source, std::string source_entity)
 	{
 		std::unique_lock<std::recursive_mutex> logger_lock(_logger_mutex);
 		if (_asynchronous_mode) {
-			_log_records.emplace_back(log_level, log_kind, source, source_entity,
+			_log_records.emplace_back(log_level, log_kind, module_name, source, source_entity,
 				log_message, std::chrono::system_clock::now());
 			_logging_smph.release();
 		}
 		else {
-			Write_log(LogRecord(log_level, log_kind, source, source_entity,
+			Write_log(LogRecord(log_level, log_kind, module_name, source, source_entity,
 				log_message, std::chrono::system_clock::now()));
 		}
 	}
@@ -605,12 +612,11 @@ namespace MessirLogger {
 
 			static MessirLogger::LoggerConfig default_config(
 				{
-					std::make_shared<MessirLogger::TargetConfig>("MessirComm", "", MessirLogger::TargetType::SYSTEM_OUT_TARGET),
-					std::make_shared<MessirLogger::FileTargetConfig>("FileTarget",	"", (std::string)CommonReg::Trace_path(), "",
-					0, 24, "_", ".json"),
+					std::make_shared<MessirLogger::TargetConfig>("MssStdOut", "", MessirLogger::TargetType::SYSTEM_OUT_TARGET),
+					std::make_shared<MessirLogger::FileTargetConfig>("MssTraceFile", "", "", ""),
 				},
 				{
-					{MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKind::KIND_ALL, {"MessirComm", "FileTarget"}},
+					{MessirLogger::LogLevel::LEVEL_DEBUG, MessirLogger::LogKind::KIND_ALL, {"MssStdOut", "MssTraceFile"}}
 				}
 			);
 
@@ -641,7 +647,7 @@ namespace MessirLogger {
 } // namespace MessirLogger
 
 log_line::~log_line() {
-	_logger.Log_entry(level, kind, this->str(), _source, _entity);
+	_logger.Log_entry(_level, _kind, this->str(), _module_name, _source, _entity);
 }
 
 void log_line::Format(const char* format, ...) {
