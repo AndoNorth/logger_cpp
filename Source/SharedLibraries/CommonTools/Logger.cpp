@@ -1,10 +1,10 @@
 #include "stdafx.h"
 
-#include "Logger.h"
+#include <Logger.h>
 
-#include "LogTargetStandardOutput.h"
-#include "LogTargetStandardError.h"
-#include "LogTargetFile.h"
+#include <LogTargetStandardOutput.h>
+#include <LogTargetStandardError.h>
+#include <LogTargetFile.h>
 
 #include <unordered_map>
 #include <thread>
