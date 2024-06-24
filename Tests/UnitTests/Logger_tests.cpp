@@ -6,9 +6,9 @@
 
 #include <filesystem> // used for FileTarget tests
 
-#include "Logger.h"
-#include "LogTargetFile.h"
-#include "CommonToolsMisc.h"
+#include <Logger.h>
+#include <LogTargetFile.h>
+#include <CommonToolsMisc.h>
 
 /**
  * referenced from trace.cpp in linux build for trace.Format().
