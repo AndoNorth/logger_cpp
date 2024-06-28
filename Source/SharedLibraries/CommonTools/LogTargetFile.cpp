@@ -90,9 +90,7 @@ namespace MessirLogger {
 	}
 
 	void FileTarget::Setup() {
-
 		this->Update_filename(std::chrono::system_clock::now());
-		this->Reopen_file();
 	}
 
 	void FileTarget::Maintenance() {
@@ -152,7 +150,9 @@ namespace MessirLogger {
 		return config;
 	}
 
-	void FileTarget::Refresh() { this->Reopen_file(); }
+	void FileTarget::Refresh() {
+		this->Reopen_file();
+	}
 
 	TargetResult FileTarget::Try_write_log(const LogRecord& record) {
 

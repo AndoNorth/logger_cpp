@@ -45,7 +45,6 @@
 #define MSS_FATAL(kind, entity) \
 	log_line(MessirLogger::LogLevel::LEVEL_FATAL, kind, MSS_MODULE_NAME, std::source_location::current(), entity, __logger)
 
-
 #define MSS_DEBUG_EXTRA(extra_str, kind, entity) \
 	if (global_config.Active(extra_str)) \
 		log_line(MessirLogger::LogLevel::LEVEL_DEBUG, kind, MSS_MODULE_NAME, std::source_location::current(), entity, __logger)

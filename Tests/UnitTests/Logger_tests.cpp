@@ -107,10 +107,10 @@ struct Configuration_tests : public testing::Test {
 				std::make_shared<MessirLogger::TargetConfig>("MessirCommErr",
 					"[%%level:%%kind] [%%entity] - %%log", MessirLogger::TargetType::SYSTEM_ERR_TARGET),
 				std::make_shared<MessirLogger::FileTargetConfig>("FileTarget1",
-					"[%%level:%%kind] [%%entity] - %%log", "", "test1",
+					"[%%level:%%kind] [%%entity] - %%log", "./", "test1",
 					0, 0, "", "", "%%path%%filename%%suffix"),
 				std::make_shared<MessirLogger::FileTargetConfig>("FileTarget2",
-					"%%time [%%level] - %%log", "", "test2",
+					"%%time [%%level] - %%log", "./", "test2",
 					0, 0, "", "", "%%path%%filename%%suffix"),
 			},
 			{
@@ -159,7 +159,7 @@ TEST_F(Configuration_tests, Configuration_JSONSerializer) {
 	test_config.Serialize(serializer);
 	std::string contents = serializer.m_json.dump();
 	// NOTE: default values may be filled in the output file, but not in this string comparison
-	std::string expected_contents = "{\"asynchronous_mode\":false,\"dispatch\":[{\"kind\":0,\"level\":0,\"targets\":[\"MessirCommErr\",\"MessirCommOut\"]},{\"kind\":3,\"level\":1,\"targets\":[\"FileTarget1\",\"FileTarget2\"]},{\"kind\":2,\"level\":1,\"targets\":[\"FileTarget1\",\"FileTarget2\"]},{\"kind\":0,\"level\":2,\"targets\":[\"FileTarget2\"]}],\"targets\":[{\"format_string\":\"[%%level:%%kind] [%%entity] - %%log\",\"target_name\":\"MessirCommOut\",\"target_type\":0},{\"format_string\":\"[%%level:%%kind] [%%entity] - %%log\",\"target_name\":\"MessirCommErr\",\"target_type\":1},{\"filename\":\"test1\",\"filename_format\":\"%%path%%filename%%suffix\",\"filename_time_format\":\"\",\"filepath\":\"\",\"format_string\":\"[%%level:%%kind] [%%entity] - %%log\",\"log_frequency\":0,\"max_filesize\":0,\"prefix\":\"\",\"suffix\":\"\",\"target_name\":\"FileTarget1\",\"target_type\":2},{\"filename\":\"test2\",\"filename_format\":\"%%path%%filename%%suffix\",\"filename_time_format\":\"\",\"filepath\":\"\",\"format_string\":\"%%time [%%level] - %%log\",\"log_frequency\":0,\"max_filesize\":0,\"prefix\":\"\",\"suffix\":\"\",\"target_name\":\"FileTarget2\",\"target_type\":2}],\"use_fallback\":false}";
+	std::string expected_contents = R"({"asynchronous_mode":false,"dispatch":[{"kind":0,"level":0,"targets":["MessirCommErr","MessirCommOut"]},{"kind":3,"level":1,"targets":["FileTarget1","FileTarget2"]},{"kind":2,"level":1,"targets":["FileTarget1","FileTarget2"]},{"kind":0,"level":2,"targets":["FileTarget2"]}],"targets":[{"format_string":"[%%level:%%kind] [%%entity] - %%log","target_name":"MessirCommOut","target_type":0},{"format_string":"[%%level:%%kind] [%%entity] - %%log","target_name":"MessirCommErr","target_type":1},{"filename":"test1","filename_format":"%%path%%filename%%suffix","filepath":"./","format_string":"[%%level:%%kind] [%%entity] - %%log","log_frequency":0,"max_filesize":0,"prefix":"","suffix":".log","target_name":"FileTarget1","target_type":2},{"filename":"test2","filename_format":"%%path%%filename%%suffix","filepath":"./","format_string":"%%time [%%level] - %%log","log_frequency":0,"max_filesize":0,"prefix":"","suffix":".log","target_name":"FileTarget2","target_type":2}],"use_fallback":false})";
 	ASSERT_TRUE(expected_contents == contents);
 }
 
@@ -771,7 +771,7 @@ struct File_target_tests : public testing::Test {
 		MessirLogger::LoggerConfig default_config(
 			{
 				std::make_shared<MessirLogger::FileTargetConfig>("FileTarget",
-					"[%%level:%%kind] - %%log", "", "file_target_test",
+					"[%%level:%%kind] - %%log", "./", "file_target_test",
 					0, 0, "", "", "%%path%%filename%%suffix"),
 			},
 			{
@@ -829,7 +829,7 @@ struct File_target_err_tests : public testing::Test {
 		MessirLogger::LoggerConfig default_config(
 			{
 				std::make_shared<MessirLogger::FileTargetConfig>("FileTarget",
-					"", "", "file_target_test",
+					"", "./", "file_target_test",
 					0, 0, "", "", "%%path%%filename%%suffix"),
 			},
 			{
