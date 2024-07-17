@@ -85,9 +85,9 @@ TEST(Trace_format_tests, linux_format_mixed_test) {
 }
 
 /**
- * Configuration_tests are to test the importing and exporting configuration.
+ * Logger_configuration_tests are to test the importing and exporting configuration.
  */
-struct Configuration_tests : public testing::Test {
+struct Logger_configuration_tests : public testing::Test {
 
 	MessirLogger::Logger* logger;
 	MessirLogger::LoggerConfig test_config;
@@ -114,10 +114,10 @@ struct Configuration_tests : public testing::Test {
 					0, 0, "", "", "%%path%%filename%%suffix"),
 			},
 			{
-				{MessirLogger::LogLevel::LEVEL_DEBUG, MessirLogger::LogKind::KIND_ALL, {"MessirCommOut", "MessirCommErr"}},
+				{MessirLogger::LogLevel::LEVEL_DEBUG, MessirLogger::LogKindSet().All_set(), {"MessirCommOut", "MessirCommErr"}},
 				{MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKind::KIND_EVENT, {"FileTarget1", "FileTarget2"}},
 				{MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKind::KIND_ACTION, {"FileTarget1", "FileTarget2"}},
-				{MessirLogger::LogLevel::LEVEL_WARNING, MessirLogger::LogKind::KIND_ALL, {"FileTarget2"}},
+				{MessirLogger::LogLevel::LEVEL_WARNING, MessirLogger::LogKindSet().All_set(), {"FileTarget2"}},
 			},
 			false,
 			false
@@ -138,32 +138,32 @@ struct Configuration_tests : public testing::Test {
 	}
 };
 
-TEST_F(Configuration_tests, All_config_test) {
+TEST_F(Logger_configuration_tests, All_config_test) {
 	ASSERT_TRUE(test_config == logger->Get_config());
 }
 
-TEST_F(Configuration_tests, Reconfigure_test) {
+TEST_F(Logger_configuration_tests, Reconfigure_test) {
 	logger->Reconfigure(test_config);
 	logger->Stop(); // Reconfigure() starts threads, call to stop them before they delay tests
 	ASSERT_TRUE(test_config == logger->Get_config());
 }
 
-TEST_F(Configuration_tests, Reconfigure_empty_test) {
+TEST_F(Logger_configuration_tests, Reconfigure_empty_test) {
 	logger->Reconfigure(empty_config);
 	logger->Stop(); // Reconfigure() starts threads, call to stop them before they delay tests
 	ASSERT_TRUE(empty_config == logger->Get_config());
 }
 
-TEST_F(Configuration_tests, Configuration_JSONSerializer) {
+TEST_F(Logger_configuration_tests, Configuration_JSONSerializer) {
 	JSONSerializer serializer;
 	test_config.Serialize(serializer);
 	std::string contents = serializer.m_json.dump();
 	// NOTE: default values may be filled in the output file, but not in this string comparison
-	std::string expected_contents = R"({"asynchronous_mode":false,"dispatch":[{"kind":0,"level":0,"targets":["MessirCommErr","MessirCommOut"]},{"kind":3,"level":1,"targets":["FileTarget1","FileTarget2"]},{"kind":2,"level":1,"targets":["FileTarget1","FileTarget2"]},{"kind":0,"level":2,"targets":["FileTarget2"]}],"targets":[{"format_string":"[%%level:%%kind] [%%entity] - %%log","target_name":"MessirCommOut","target_type":0},{"format_string":"[%%level:%%kind] [%%entity] - %%log","target_name":"MessirCommErr","target_type":1},{"filename":"test1","filename_format":"%%path%%filename%%suffix","filepath":"./","format_string":"[%%level:%%kind] [%%entity] - %%log","log_frequency":0,"max_filesize":0,"prefix":"","suffix":".log","target_name":"FileTarget1","target_type":2},{"filename":"test2","filename_format":"%%path%%filename%%suffix","filepath":"./","format_string":"%%time [%%level] - %%log","log_frequency":0,"max_filesize":0,"prefix":"","suffix":".log","target_name":"FileTarget2","target_type":2}],"use_fallback":false})";
+	std::string expected_contents = R"({"asynchronous_mode":false,"dispatch":[{"kinds":{"bits":7},"level":0,"targets":["MessirCommErr","MessirCommOut"]},{"kinds":{"bits":4},"level":1,"targets":["FileTarget1","FileTarget2"]},{"kinds":{"bits":2},"level":1,"targets":["FileTarget1","FileTarget2"]},{"kinds":{"bits":7},"level":2,"targets":["FileTarget2"]}],"targets":[{"format_string":"[%%level:%%kind] [%%entity] - %%log","target_name":"MessirCommOut","target_type":0},{"format_string":"[%%level:%%kind] [%%entity] - %%log","target_name":"MessirCommErr","target_type":1},{"filename":"test1","filename_format":"%%path%%filename%%suffix","filepath":"./","format_string":"[%%level:%%kind] [%%entity] - %%log","log_frequency":0,"max_filesize":0,"prefix":"","suffix":".log","target_name":"FileTarget1","target_type":2},{"filename":"test2","filename_format":"%%path%%filename%%suffix","filepath":"./","format_string":"%%time [%%level] - %%log","log_frequency":0,"max_filesize":0,"prefix":"","suffix":".log","target_name":"FileTarget2","target_type":2}],"use_fallback":false})";
 	ASSERT_TRUE(expected_contents == contents);
 }
 
-TEST_F(Configuration_tests, Configuration_empty_JSONSerializer) {
+TEST_F(Logger_configuration_tests, Configuration_empty_JSONSerializer) {
 	JSONSerializer serializer;
 	empty_config.Serialize(serializer);
 	std::string contents = serializer.m_json.dump();
@@ -174,7 +174,7 @@ TEST_F(Configuration_tests, Configuration_empty_JSONSerializer) {
 /**
  * test configuration persistence
 */
-TEST_F(Configuration_tests, Save_load_test) {
+TEST_F(Logger_configuration_tests, Save_load_test) {
 	ASSERT_TRUE(test_config == logger->Get_config());
 	std::string filetarget = "./config.json";
 	logger->Save_config(filetarget);
@@ -248,13 +248,13 @@ bool Check_maintenance_called(const MessirLogger::Target& target) {
 }
 
 /**
- * Formatter_tests are to test the custom formatter in _targets, max year tested = 2035.
+ * Target_time_formatter_tests are to test the custom formatter in _targets, max year tested = 2035.
  * useful debug logs: 
  *   std::cout << "expected=\"" << expected_str << "\",formatted=\"" << formatted_str << "\"" << std::endl;
  * test results validated using:
  *   https://www.timeanddate.com/
  */
-TEST(Formatter_tests, Time_formatter_time_test_00) {
+TEST(Target_time_formatter_tests, Time_test_00) {
 	std::string expected_str = "00,00,00,000";
 	TestTarget target;
 	std::string format_str = "%%hour,%%min,%%sec,%%ms";
@@ -265,7 +265,7 @@ TEST(Formatter_tests, Time_formatter_time_test_00) {
 	ASSERT_TRUE(match);
 }
 
-TEST(Formatter_tests, Time_formatter_time_test_01) {
+TEST(Target_time_formatter_tests, Time_test_01) {
 	std::string expected_str = "06,07,08,009";
 	TestTarget target;
 	std::string format_str = "%%hour,%%min,%%sec,%%ms";
@@ -279,7 +279,7 @@ TEST(Formatter_tests, Time_formatter_time_test_01) {
 	ASSERT_TRUE(match);
 }
 
-TEST(Formatter_tests, Time_formatter_time_test_02) {
+TEST(Target_time_formatter_tests, Time_test_02) {
 	std::string expected_str = "13,14,15,016";
 	TestTarget target;
 	std::string format_str = "%%hour,%%min,%%sec,%%ms";
@@ -293,7 +293,7 @@ TEST(Formatter_tests, Time_formatter_time_test_02) {
 	ASSERT_TRUE(match);
 }
 
-TEST(Formatter_tests, Time_formatter_time_test_03) {
+TEST(Target_time_formatter_tests, Time_test_03) {
 	std::string expected_str = "01,02,03,004";
 	TestTarget target;
 	std::string format_str = "%%hour,%%min,%%sec,%%ms";
@@ -307,7 +307,7 @@ TEST(Formatter_tests, Time_formatter_time_test_03) {
 	ASSERT_TRUE(match);
 }
 
-TEST(Formatter_tests, Time_formatter_date_test_00) {
+TEST(Target_time_formatter_tests, Date_test_00) {
 	std::string expected_str = "1970,70,01,Jan,01";
 	TestTarget target;
 	std::string format_str = "%%year,%%yr,%%month,%%monstr,%%day";
@@ -318,7 +318,7 @@ TEST(Formatter_tests, Time_formatter_date_test_00) {
 	ASSERT_TRUE(match);
 }
 
-TEST(Formatter_tests, Time_formatter_date_test_01) {
+TEST(Target_time_formatter_tests, Date_test_01) {
 	std::string expected_str = "1989,89,01,Jan,18";
 	TestTarget target;
 	std::string format_str = "%%year,%%yr,%%month,%%monstr,%%day";
@@ -330,7 +330,7 @@ TEST(Formatter_tests, Time_formatter_date_test_01) {
 	ASSERT_TRUE(match);
 }
 
-TEST(Formatter_tests, Time_formatter_date_test_02) {
+TEST(Target_time_formatter_tests, Date_test_02) {
 	std::string expected_str = "2023,23,02,Feb,03";
 	TestTarget target;
 	std::string format_str = "%%year,%%yr,%%month,%%monstr,%%day";
@@ -342,7 +342,7 @@ TEST(Formatter_tests, Time_formatter_date_test_02) {
 	ASSERT_TRUE(match);
 }
 
-TEST(Formatter_tests, Time_formatter_date_test_03) {
+TEST(Target_time_formatter_tests, Date_test_03) {
 	std::string expected_str = "2016,16,03,Mar,01";
 	TestTarget target;
 	std::string format_str = "%%year,%%yr,%%month,%%monstr,%%day";
@@ -354,7 +354,7 @@ TEST(Formatter_tests, Time_formatter_date_test_03) {
 	ASSERT_TRUE(match);
 }
 
-TEST(Formatter_tests, Time_formatter_date_test_04) {
+TEST(Target_time_formatter_tests, Date_test_04) {
 	std::string expected_str = "2000,00,04,Apr,29";
 	TestTarget target;
 	std::string format_str = "%%year,%%yr,%%month,%%monstr,%%day";
@@ -366,7 +366,7 @@ TEST(Formatter_tests, Time_formatter_date_test_04) {
 	ASSERT_TRUE(match);
 }
 
-TEST(Formatter_tests, Time_formatter_date_test_05) {
+TEST(Target_time_formatter_tests, Date_test_05) {
 	std::string expected_str = "1975,75,05,May,30";
 	TestTarget target;
 	std::string format_str = "%%year,%%yr,%%month,%%monstr,%%day";
@@ -378,7 +378,7 @@ TEST(Formatter_tests, Time_formatter_date_test_05) {
 	ASSERT_TRUE(match);
 }
 
-TEST(Formatter_tests, Time_formatter_date_test_06) {
+TEST(Target_time_formatter_tests, Date_test_06) {
 	std::string expected_str = "2032,32,06,Jun,16";
 	TestTarget target;
 	std::string format_str = "%%year,%%yr,%%month,%%monstr,%%day";
@@ -390,7 +390,7 @@ TEST(Formatter_tests, Time_formatter_date_test_06) {
 	ASSERT_TRUE(match);
 }
 
-TEST(Formatter_tests, Time_formatter_date_test_07) {
+TEST(Target_time_formatter_tests, Date_test_07) {
 	std::string expected_str = "1988,88,07,Jul,04";
 	TestTarget target;
 	std::string format_str = "%%year,%%yr,%%month,%%monstr,%%day";
@@ -402,7 +402,7 @@ TEST(Formatter_tests, Time_formatter_date_test_07) {
 	ASSERT_TRUE(match);
 }
 
-TEST(Formatter_tests, Time_formatter_date_test_08) {
+TEST(Target_time_formatter_tests, Date_test_08) {
 	std::string expected_str = "1996,96,08,Aug,30";
 	TestTarget target;
 	std::string format_str = "%%year,%%yr,%%month,%%monstr,%%day";
@@ -414,7 +414,7 @@ TEST(Formatter_tests, Time_formatter_date_test_08) {
 	ASSERT_TRUE(match);
 }
 
-TEST(Formatter_tests, Time_formatter_date_test_09) {
+TEST(Target_time_formatter_tests, Date_test_09) {
 	std::string expected_str = "2011,11,09,Sep,14";
 	TestTarget target;
 	std::string format_str = "%%year,%%yr,%%month,%%monstr,%%day";
@@ -426,7 +426,7 @@ TEST(Formatter_tests, Time_formatter_date_test_09) {
 	ASSERT_TRUE(match);
 }
 
-TEST(Formatter_tests, Time_formatter_date_test_10) {
+TEST(Target_time_formatter_tests, Date_test_10) {
 	std::string expected_str = "1987,87,10,Oct,28";
 	TestTarget target;
 	std::string format_str = "%%year,%%yr,%%month,%%monstr,%%day";
@@ -438,7 +438,7 @@ TEST(Formatter_tests, Time_formatter_date_test_10) {
 	ASSERT_TRUE(match);
 }
 
-TEST(Formatter_tests, Time_formatter_date_test_11) {
+TEST(Target_time_formatter_tests, Date_test_11) {
 	std::string expected_str = "1999,99,11,Nov,21";
 	TestTarget target;
 	std::string format_str = "%%year,%%yr,%%month,%%monstr,%%day";
@@ -450,7 +450,7 @@ TEST(Formatter_tests, Time_formatter_date_test_11) {
 	ASSERT_TRUE(match);
 }
 
-TEST(Formatter_tests, Time_formatter_date_test_12) {
+TEST(Target_time_formatter_tests, Date_test_12) {
 	std::string expected_str = "1996,96,12,Dec,29";
 	TestTarget target;
 	std::string format_str = "%%year,%%yr,%%month,%%monstr,%%day";
@@ -462,7 +462,7 @@ TEST(Formatter_tests, Time_formatter_date_test_12) {
 	ASSERT_TRUE(match);
 }
 
-TEST(Formatter_tests, Time_formatter_datatime_test_00) {
+TEST(Target_time_formatter_tests, Datatime_test_00) {
 	std::string expected_str = "1970-01-01 00:00:00,1970-01-01,00:00:00.0000000";
 	TestTarget target;
 	std::string format_str = "%%datatime,%%date,%%time";
@@ -473,7 +473,7 @@ TEST(Formatter_tests, Time_formatter_datatime_test_00) {
 	ASSERT_TRUE(match);
 }
 
-TEST(Formatter_tests, Time_formatter_datatime_test_01) {
+TEST(Target_time_formatter_tests, Datatime_test_01) {
 	std::string expected_str = "2035-09-20 01:02:03,2035-09-20,01:02:03.0040000";
 	TestTarget target;
 	std::string format_str = "%%datatime,%%date,%%time";
@@ -488,7 +488,7 @@ TEST(Formatter_tests, Time_formatter_datatime_test_01) {
 	ASSERT_TRUE(match);
 }
 
-TEST(Formatter_tests, Time_formatter_datatime_test_02) {
+TEST(Target_time_formatter_tests, Datatime_test_02) {
 	std::string expected_str = "2021-10-17 12:34:56,2021-10-17,12:34:56.7890000";
 	TestTarget target;
 	std::string format_str = "%%datatime,%%date,%%time";
@@ -502,6 +502,59 @@ TEST(Formatter_tests, Time_formatter_datatime_test_02) {
 	bool match = expected_str == formatted_str;
 	ASSERT_TRUE(match);
 }
+
+
+/**
+ * LogKindSet_tests are to test the setting of bits and public interfaces
+ */
+TEST(LogKindSet_tests, kind_ALL) {
+	std::string expected_kinds_str = "ALL";
+	MessirLogger::LogKindSet kinds = MessirLogger::LogKindSet().All_set();
+	ASSERT_TRUE(kinds.To_string() == expected_kinds_str);
+}
+
+TEST(LogKindSet_tests, kind_TECHNICAL) {
+	std::string expected_kinds_str = "TECHNICAL";
+	MessirLogger::LogKindSet kinds(MessirLogger::LogKind::KIND_TECHNICAL);
+	ASSERT_TRUE(kinds.To_string() == expected_kinds_str);
+}
+
+TEST(LogKindSet_tests, kind_ACTION) {
+	std::string expected_kinds_str = "ACTION";
+	MessirLogger::LogKindSet kinds(MessirLogger::LogKind::KIND_ACTION);
+	ASSERT_TRUE(kinds.To_string() == expected_kinds_str);
+}
+
+TEST(LogKindSet_tests, kind_EVENT) {
+	std::string expected_kinds_str = "EVENT";
+	MessirLogger::LogKindSet kinds(MessirLogger::LogKind::KIND_EVENT);
+	ASSERT_TRUE(kinds.To_string() == expected_kinds_str);
+}
+
+TEST(LogKindSet_tests, kind_TECHNICAL_ACTION) {
+	std::string expected_kinds_str = "TECHNICAL,ACTION";
+	MessirLogger::LogKindSet kinds;
+	kinds.Set(MessirLogger::LogKind::KIND_TECHNICAL);
+	kinds.Set(MessirLogger::LogKind::KIND_ACTION);
+	ASSERT_TRUE(kinds.To_string() == expected_kinds_str);
+}
+
+TEST(LogKindSet_tests, kind_TECHNICAL_EVENT) {
+	std::string expected_kinds_str = "TECHNICAL,EVENT";
+	MessirLogger::LogKindSet kinds;
+	kinds.Set(MessirLogger::LogKind::KIND_TECHNICAL);
+	kinds.Set(MessirLogger::LogKind::KIND_EVENT);
+	ASSERT_TRUE(kinds.To_string() == expected_kinds_str);
+}
+
+TEST(LogKindSet_tests, kind_ACTION_EVENT) {
+	std::string expected_kinds_str = "ACTION,EVENT";
+	MessirLogger::LogKindSet kinds;
+	kinds.Set(MessirLogger::LogKind::KIND_ACTION);
+	kinds.Set(MessirLogger::LogKind::KIND_EVENT);
+	ASSERT_TRUE(kinds.To_string() == expected_kinds_str);
+}
+
 
 /**
  * Logger_dispatch_tests are to test the dispatch filtering system, we create a set of dispatch
@@ -527,12 +580,12 @@ struct Logger_dispatch_tests : public testing::Test {
 		MessirLogger::LoggerConfig default_config(
 			{},
 			{
-				{MessirLogger::LogLevel::LEVEL_DEBUG, MessirLogger::LogKind::KIND_ALL, {"TestTarget_DEBUG"}},
-				{MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKind::KIND_ALL, {"TestTarget_INFO"}},
-				{MessirLogger::LogLevel::LEVEL_WARNING, MessirLogger::LogKind::KIND_ALL, {"TestTarget_WARNING"}},
-				{MessirLogger::LogLevel::LEVEL_ERROR, MessirLogger::LogKind::KIND_ALL, {"TestTarget_ERROR"}},
-				{MessirLogger::LogLevel::LEVEL_CRITICAL, MessirLogger::LogKind::KIND_ALL, {"TestTarget_CRITICAL"}},
-				{MessirLogger::LogLevel::LEVEL_FATAL, MessirLogger::LogKind::KIND_ALL, {"TestTarget_FATAL"}},
+				{MessirLogger::LogLevel::LEVEL_DEBUG, MessirLogger::LogKindSet().All_set(), {"TestTarget_DEBUG"}},
+				{MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKindSet().All_set(), {"TestTarget_INFO"}},
+				{MessirLogger::LogLevel::LEVEL_WARNING, MessirLogger::LogKindSet().All_set(), {"TestTarget_WARNING"}},
+				{MessirLogger::LogLevel::LEVEL_ERROR, MessirLogger::LogKindSet().All_set(), {"TestTarget_ERROR"}},
+				{MessirLogger::LogLevel::LEVEL_CRITICAL, MessirLogger::LogKindSet().All_set(), {"TestTarget_CRITICAL"}},
+				{MessirLogger::LogLevel::LEVEL_FATAL, MessirLogger::LogKindSet().All_set(), {"TestTarget_FATAL"}},
 				{MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKind::KIND_TECHNICAL, {"TestTarget_TECHNICAL"}},
 				{MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKind::KIND_ACTION, {"TestTarget_ACTION"}},
 				{MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKind::KIND_EVENT, {"TestTarget_EVENT"}},
@@ -621,7 +674,7 @@ TEST_F(Logger_dispatch_tests, Dispatch_default_record_test) {
 TEST_F(Logger_dispatch_tests, Dispatch_level_DEBUG_test) {
 
 	MessirLogger::LogRecord test_record = MessirLogger::LogRecord(
-		MessirLogger::LogLevel::LEVEL_DEBUG, MessirLogger::LogKind::KIND_ALL,
+		MessirLogger::LogLevel::LEVEL_DEBUG, MessirLogger::LogKindSet().All_set(),
 		MSS_MODULE_NAME, std::source_location::current(), "",
 		"log message");
 	logger->Log_entry(test_record);
@@ -637,7 +690,7 @@ TEST_F(Logger_dispatch_tests, Dispatch_level_DEBUG_test) {
 TEST_F(Logger_dispatch_tests, Dispatch_level_INFO_test) {
 
 	MessirLogger::LogRecord test_record = MessirLogger::LogRecord(
-		MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKind::KIND_ALL,
+		MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKindSet().All_set(),
 		MSS_MODULE_NAME, std::source_location::current(), "",
 		"log message");
 	logger->Log_entry(test_record);
@@ -653,7 +706,7 @@ TEST_F(Logger_dispatch_tests, Dispatch_level_INFO_test) {
 TEST_F(Logger_dispatch_tests, Dispatch_level_WARNING_test) {
 
 	MessirLogger::LogRecord test_record = MessirLogger::LogRecord(
-		MessirLogger::LogLevel::LEVEL_WARNING, MessirLogger::LogKind::KIND_ALL,
+		MessirLogger::LogLevel::LEVEL_WARNING, MessirLogger::LogKindSet().All_set(),
 		MSS_MODULE_NAME, std::source_location::current(), "",
 		"log message");
 	logger->Log_entry(test_record);
@@ -669,7 +722,7 @@ TEST_F(Logger_dispatch_tests, Dispatch_level_WARNING_test) {
 TEST_F(Logger_dispatch_tests, Dispatch_level_ERROR_test) {
 
 	MessirLogger::LogRecord test_record = MessirLogger::LogRecord(
-		MessirLogger::LogLevel::LEVEL_ERROR, MessirLogger::LogKind::KIND_ALL,
+		MessirLogger::LogLevel::LEVEL_ERROR, MessirLogger::LogKindSet().All_set(),
 		MSS_MODULE_NAME, std::source_location::current(), "",
 		"log message");
 	logger->Log_entry(test_record);
@@ -685,7 +738,7 @@ TEST_F(Logger_dispatch_tests, Dispatch_level_ERROR_test) {
 TEST_F(Logger_dispatch_tests, Dispatch_level_CRITICAL_test) {
 
 	MessirLogger::LogRecord test_record = MessirLogger::LogRecord(
-		MessirLogger::LogLevel::LEVEL_CRITICAL, MessirLogger::LogKind::KIND_ALL,
+		MessirLogger::LogLevel::LEVEL_CRITICAL, MessirLogger::LogKindSet().All_set(),
 		MSS_MODULE_NAME, std::source_location::current(), "",
 		"log message");
 	logger->Log_entry(test_record);
@@ -701,7 +754,7 @@ TEST_F(Logger_dispatch_tests, Dispatch_level_CRITICAL_test) {
 TEST_F(Logger_dispatch_tests, Dispatch_level_FATAL_test) {
 
 	MessirLogger::LogRecord test_record = MessirLogger::LogRecord(
-		MessirLogger::LogLevel::LEVEL_FATAL, MessirLogger::LogKind::KIND_ALL,
+		MessirLogger::LogLevel::LEVEL_FATAL, MessirLogger::LogKindSet().All_set(),
 		MSS_MODULE_NAME, std::source_location::current(), "",
 		"log message");
 	logger->Log_entry(test_record);
@@ -775,7 +828,7 @@ struct File_target_tests : public testing::Test {
 					0, 0, "", "", "%%path%%filename%%suffix"),
 			},
 			{
-				{MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKind::KIND_ALL, {"FileTarget"}},
+				{MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKindSet().All_set(), {"FileTarget"}},
 			},
 			false,
 			false
@@ -793,7 +846,7 @@ struct File_target_tests : public testing::Test {
 TEST_F(File_target_tests, FileTarget_test) {
 
 	MessirLogger::LogRecord test_record = MessirLogger::LogRecord(
-		MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKind::KIND_ALL,
+		MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKindSet().All_set(),
 		MSS_MODULE_NAME, std::source_location::current(), "",
 		"log message");
 
@@ -833,7 +886,7 @@ struct File_target_err_tests : public testing::Test {
 					0, 0, "", "", "%%path%%filename%%suffix"),
 			},
 			{
-				{MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKind::KIND_ALL, {"FileTarget"}},
+				{MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKindSet().All_set(), {"FileTarget"}},
 			},
 			false,
 			false
@@ -867,7 +920,7 @@ struct Logger_async_tests : public testing::Test {
 		MessirLogger::LoggerConfig default_config(
 			{},
 			{
-				{MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKind::KIND_ALL, {"TestTarget_INFO"}},
+				{MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKindSet().All_set(), {"TestTarget_INFO"}},
 			},
 			false,
 			true
@@ -890,11 +943,11 @@ struct Logger_async_tests : public testing::Test {
 TEST_F(Logger_async_tests, Async_test) {
 
 	MessirLogger::LogRecord test_record1 = MessirLogger::LogRecord(
-		MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKind::KIND_ALL,
+		MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKindSet().All_set(),
 		MSS_MODULE_NAME, std::source_location::current(), "",
 		"log message");
 	MessirLogger::LogRecord test_record2 = MessirLogger::LogRecord(
-		MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKind::KIND_ALL,
+		MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKindSet().All_set(),
 		MSS_MODULE_NAME, std::source_location::current(), "",
 		"log message");
 
@@ -927,7 +980,7 @@ struct Logger_maintenance_tests : public testing::Test {
 		MessirLogger::LoggerConfig default_config(
 			{},
 			{
-				{MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKind::KIND_ALL, {"TestTarget_INFO"}},
+				{MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKindSet().All_set(), {"TestTarget_INFO"}},
 			},
 			false,
 			true

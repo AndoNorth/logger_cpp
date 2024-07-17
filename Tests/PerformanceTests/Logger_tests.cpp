@@ -131,7 +131,7 @@ void Logger_Write_log(benchmark::State& state, MessirLogger::Logger* logger) {
 	for (auto _ : state) {
 		for (int i = 0; i < state.range(0); i++) {
 			MessirLogger::LogRecord test_record = MessirLogger::LogRecord(
-				MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKind::KIND_ALL,
+				MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKindSet().All_set(),
 				MSS_MODULE_NAME, std::source_location::current(), "",
 				"log message " + std::to_string(i));
 			logger->Log_entry(test_record);
@@ -186,7 +186,7 @@ public:
 					"[%%level:%%kind] - %%log", MessirLogger::TargetType::SYSTEM_OUT_TARGET),
 			},
 			{
-				{MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKind::KIND_ALL, {"StdOut"}},
+				{MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKindSet().All_set(), {"StdOut"}},
 			},
 			false,
 			false
@@ -220,7 +220,7 @@ public:
 					"[%%level:%%kind] - %%log", MessirLogger::TargetType::SYSTEM_OUT_TARGET),
 			},
 			{
-				{MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKind::KIND_ALL, {"StdOut"}},
+				{MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKindSet().All_set(), {"StdOut"}},
 			},
 			false,
 			true
@@ -256,7 +256,7 @@ public:
 					0, 0, "", "", "%%path%%filename%%suffix"),
 			},
 			{
-				{MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKind::KIND_ALL, {"StdOut"}},
+				{MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKindSet().All_set(), {"StdOut"}},
 			},
 			false,
 			false
@@ -292,7 +292,7 @@ public:
 					0, 0, "", "", "%%path%%filename%%suffix"),
 			},
 			{
-				{MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKind::KIND_ALL, {"StdOut"}},
+				{MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKindSet().All_set(), {"StdOut"}},
 			},
 			false,
 			false
