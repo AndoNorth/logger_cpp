@@ -27,47 +27,47 @@
  * MSS_WARNING(LOG_TECHNICAL, "surpervision").Format("format_str, %s, %d, %ld", arg1, arg2, arg3);
  */
 
-#define MSS_DEBUG(kind, entity) \
-	log_line(MessirLogger::LogLevel::LEVEL_DEBUG, kind, MSS_MODULE_NAME, std::source_location::current(), entity, __logger)
+#define MSS_DEBUG(kinds, entity) \
+	log_line(MessirLogger::LogLevel::LEVEL_DEBUG, MessirLogger::LogKindSet(kinds), MSS_MODULE_NAME, std::source_location::current(), entity, __logger)
 
-#define MSS_INFO(kind, entity) \
-	log_line(MessirLogger::LogLevel::LEVEL_INFO, kind, MSS_MODULE_NAME, std::source_location::current(), entity, __logger)
+#define MSS_INFO(kinds, entity) \
+	log_line(MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKindSet(kinds), MSS_MODULE_NAME, std::source_location::current(), entity, __logger)
 
-#define MSS_WARNING(kind, entity) \
-	log_line(MessirLogger::LogLevel::LEVEL_WARNING, kind, MSS_MODULE_NAME, std::source_location::current(), entity, __logger)
+#define MSS_WARNING(kinds, entity) \
+	log_line(MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKindSet(kinds), MSS_MODULE_NAME, std::source_location::current(), entity, __logger)
 
-#define MSS_ERROR(kind, entity) \
-	log_line(MessirLogger::LogLevel::LEVEL_ERROR, kind, MSS_MODULE_NAME, std::source_location::current(), entity, __logger)
+#define MSS_ERROR(kinds, entity) \
+	log_line(MessirLogger::LogLevel::LEVEL_ERROR, MessirLogger::LogKindSet(kinds), MSS_MODULE_NAME, std::source_location::current(), entity, __logger)
 
-#define MSS_CRITICAL(kind, entity) \
-	log_line(MessirLogger::LogLevel::LEVEL_CRITICAL, kind, MSS_MODULE_NAME, std::source_location::current(), entity, __logger)
+#define MSS_CRITICAL(kinds, entity) \
+	log_line(MessirLogger::LogLevel::LEVEL_CRITICAL, MessirLogger::LogKindSet(kinds), MSS_MODULE_NAME, std::source_location::current(), entity, __logger)
 
-#define MSS_FATAL(kind, entity) \
-	log_line(MessirLogger::LogLevel::LEVEL_FATAL, kind, MSS_MODULE_NAME, std::source_location::current(), entity, __logger)
+#define MSS_FATAL(kinds, entity) \
+	log_line(MessirLogger::LogLevel::LEVEL_FATAL, MessirLogger::LogKindSet(kinds), MSS_MODULE_NAME, std::source_location::current(), entity, __logger)
 
-#define MSS_DEBUG_EXTRA(extra_str, kind, entity) \
+#define MSS_DEBUG_EXTRA(extra_str, kinds, entity) \
 	if (global_config.Active(extra_str)) \
-		log_line(MessirLogger::LogLevel::LEVEL_DEBUG, kind, MSS_MODULE_NAME, std::source_location::current(), entity, __logger)
+		log_line(MessirLogger::LogLevel::LEVEL_DEBUG, MessirLogger::LogKindSet(kinds), MSS_MODULE_NAME, std::source_location::current(), entity, __logger)
 
-#define MSS_INFO_EXTRA(extra_str, kind, entity) \
+#define MSS_INFO_EXTRA(extra_str, kinds, entity) \
 	if (global_config.Active(extra_str)) \
-		log_line(MessirLogger::LogLevel::LEVEL_INFO, kind, MSS_MODULE_NAME, std::source_location::current(), entity, __logger)
+		log_line(MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKindSet(kinds), MSS_MODULE_NAME, std::source_location::current(), entity, __logger)
 
-#define MSS_WARNING_EXTRA(extra_str, kind, entity) \
+#define MSS_WARNING_EXTRA(extra_str, kinds, entity) \
 	if (global_config.Active(extra_str)) \
-		log_line(MessirLogger::LogLevel::LEVEL_WARNING, kind, MSS_MODULE_NAME, std::source_location::current(), entity, __logger)
+		log_line(MessirLogger::LogLevel::LEVEL_WARNING,MessirLogger::LogKindSet(kinds), MSS_MODULE_NAME, std::source_location::current(), entity, __logger)
 
-#define MSS_ERROR_EXTRA(extra_str, kind, entity) \
+#define MSS_ERROR_EXTRA(extra_str, kinds, entity) \
 	if (global_config.Active(extra_str)) \
-		log_line(MessirLogger::LogLevel::LEVEL_ERROR, kind, MSS_MODULE_NAME, std::source_location::current(), entity, __logger)
+		log_line(MessirLogger::LogLevel::LEVEL_ERROR, MessirLogger::LogKindSet(kinds), MSS_MODULE_NAME, std::source_location::current(), entity, __logger)
 
-#define MSS_CRITICAL_EXTRA(extra_str, kind, entity) \
+#define MSS_CRITICAL_EXTRA(extra_str, kinds, entity) \
 	if (global_config.Active(extra_str)) \
-		log_line(MessirLogger::LogLevel::LEVEL_CRITICAL, kind, MSS_MODULE_NAME, std::source_location::current(), entity, __logger)
+		log_line(MessirLogger::LogLevel::LEVEL_CRITICAL, MessirLogger::LogKindSet(kinds), MSS_MODULE_NAME, std::source_location::current(), entity, __logger)
 
-#define MSS_FATAL_EXTRA(extra_str, kind, entity) \
+#define MSS_FATAL_EXTRA(extra_str, kinds, entity) \
 	if (global_config.Active(extra_str)) \
-		log_line(MessirLogger::LogLevel::LEVEL_FATAL, kind, MSS_MODULE_NAME, std::source_location::current(), entity, __logger)
+		log_line(MessirLogger::LogLevel::LEVEL_FATAL, MessirLogger::LogKindSet(kinds), MSS_MODULE_NAME, std::source_location::current(), entity, __logger)
 
 
 namespace MessirLogger {
@@ -94,23 +94,89 @@ namespace MessirLogger {
 	std::string Log_level_to_string(LogLevel level);
 
 	/**
-	 * Represents the log kind. This is used to define the log kind of a log entry, and the log kinds accepted by a given target.
+	 * Represents the log kind. This is used to define the log kinds of a log entry, and the log kinds accepted by a given target.
 	 * Used to dispatch log records to targets which match.
 	 */
-	enum LogKind {
-		KIND_ALL,       /**< covers all log kinds (log target filtering only) */
-		KIND_TECHNICAL, /**< technical-level logs */
-		KIND_ACTION,    /**< important user actions (configuration change, change-over, etc.) */
-		KIND_EVENT,     /**< events */
-		LOG_KIND_COUNT, /**< track number of log kinds */
+	enum LogKind : size_t {
+		KIND_TECHNICAL = 0,	/**< technical-level logs */
+		KIND_ACTION = 1,		/**< important user actions (configuration change, change-over, etc.) */
+		KIND_EVENT = 2,		/**< events */
+		LOG_KIND_COUNT,		/**< track number of log kinds */
 	};
 
 	/**
-	 * Returns string representation for LogKind.
-	 * 
-	 * @return log_kind_str string representation of LogKind
+	 * emulate bitset partially, but ensure it is JSONSerializable.
+	 * note that max no.bits is no.bits in size_t, assumed to be unsigned int
+	 * reference: https://en.cppreference.com/w/cpp/utility/bitset
 	 */
-	std::string Log_kind_to_string(LogKind kind);
+	class COMMONTOOLS_EXPORT LogKindSet : public JSONSerializable {
+	private:
+		size_t _bits;
+
+	public:
+		LogKindSet();
+		LogKindSet(LogKind kind);
+		LogKindSet(std::initializer_list<LogKind> kinds);
+		LogKindSet(size_t bits);
+		LogKindSet(const LogKindSet& kinds);
+
+		/**
+		 * Sets bit for input kind.
+		 */
+		void Set(LogKind kind);
+
+		/**
+		 * Returns true if bit is set.
+		 */
+		bool Test(LogKind kind) const;
+
+		/**
+		 * Sets all possible bits to 1.
+		 */
+		void Set_all();
+
+		/**
+		 * Returns a LogKindSet with all possible bits set.
+		 */
+		LogKindSet& All_set();
+
+		/**
+		 * returns the number of bits set within the possible log kinds.
+		 */
+		size_t Count() const;
+
+		/**
+		 * Returns true if any bits are set.
+		 */
+		bool Any() const;
+
+		/**
+		 * Returns true if all possible bits are set.
+		 */
+		bool All() const;
+
+		/**
+		 * Returns string representation for LogKindSet e.g "TECHNICAL,ACTION".
+		 * note the order of kinds are based on bit position
+		 *
+		 * @return log_kind_set_str string representation of LogKindSet
+		 */
+		std::string To_string() const;
+
+		LogKindSet& operator=(size_t val);
+		LogKindSet operator&(const LogKindSet& other) const;
+
+		friend bool operator==(const LogKindSet& lhs, const LogKindSet& rhs);
+
+		virtual void Serialize(JSONSerializer& serializer) override;
+		virtual void Deserialize(JSONSerializer& serializer) override;
+
+		auto GetExposedMembers() {
+			return members(
+				member("bits", &LogKindSet::_bits, this)
+			);
+		}
+	};
 
 	/**
 	 * Represents a log record.
@@ -122,9 +188,9 @@ namespace MessirLogger {
 		LogLevel level = LogLevel::LEVEL_INFO;
 
 		/**
-		 * Log kind of this record.
+		 * Log kinds of this record.
 		 */
-		LogKind kind = LogKind::KIND_ALL;
+		LogKindSet kinds;
 
 		/**
 		 * Name of the module that emitted the log record.
@@ -166,7 +232,7 @@ namespace MessirLogger {
 
 	/**
 	 * Represents a routing rule, for log records to log targets. This uses a mapping between 
-	 * a (level, kind) pair, and and set of targets identified by their name.
+	 * a (level, kinds) pair, and and set of targets identified by their name.
 	 */
 	struct COMMONTOOLS_EXPORT DispatchEntry : public JSONSerializable {
 		/**
@@ -175,17 +241,17 @@ namespace MessirLogger {
 		LogLevel level;
 
 		/**
-		 * Log kind routed by this rule.
+		 * Log kinds routed by this rule.
 		 */
-		LogKind kind;
+		LogKindSet kinds;
 
 		/**
 		 * Targets to which the matched log records will be dispatched.
 		 */
 		std::set<std::string> targets;
 
-		DispatchEntry(const LogLevel& level = LogLevel::LEVEL_INFO, const LogKind& kind = LogKind::KIND_ALL, const std::set<std::string>& targets = {})
-			: level(level), kind(kind), targets(targets)
+		DispatchEntry(const LogLevel& level = LogLevel::LEVEL_INFO, const LogKindSet& kinds = static_cast<size_t>(0), const std::set<std::string>& targets = {})
+			: level(level), kinds(kinds), targets(targets)
 		{}
 
 		virtual void Serialize(JSONSerializer& serializer) override;
@@ -194,7 +260,7 @@ namespace MessirLogger {
 		auto GetExposedMembers() {
 			return members(
 				member("level", &DispatchEntry::level, this),
-				member("kind", &DispatchEntry::kind, this),
+				member("kinds", &DispatchEntry::kinds, this), // TODO@FIX: this results in std::bitset<N> as T, which is not able to considered by json
 				member("targets", &DispatchEntry::targets, this)
 			);
 		}
@@ -235,7 +301,7 @@ namespace MessirLogger {
 		/**
 		 * Format string defining how log entries are written in the target.
 		 */
-		std::string _format_string = "%%monstr %%day %%hour:%%min:%%sec.%%ms [%%source:%%line] [%%level:%%kind] [%%module:%%entity] %%log";
+		std::string _format_string = "%%monstr %%day %%hour:%%min:%%sec.%%ms [%%source:%%line] [%%level:%%kinds] [%%module:%%entity] %%log";
 
 		/**
 		 * Identifies the type of the target (needed for deserialization).
@@ -341,7 +407,7 @@ namespace MessirLogger {
 	protected:
 		std::string _target_name;
 		std::string _format_string =
-			"%%monstr %%day %%hour:%%min:%%sec.%%ms [%%source:%%line] [%%level:%%kind] [%%module:%%entity] %%log";
+			"%%monstr %%day %%hour:%%min:%%sec.%%ms [%%source:%%line] [%%level:%%kinds] [%%module:%%entity] %%log";
 		TargetType _target_type;
 
 	protected:
@@ -439,7 +505,7 @@ namespace MessirLogger {
 
 	/**
 	 * Represents a routing rule, for log records to log targets. This uses a mapping between 
-	 * a (level, kind) pair, and and set of targets.
+	 * a (level, kinds) pair, and and set of targets.
 	 */
 	struct DispatchKey {
 		/**
@@ -448,9 +514,9 @@ namespace MessirLogger {
 		LogLevel level;
 
 		/**
-		 * Log kind routed by this rule.
+		 * Log kinds routed by this rule.
 		 */
-		LogKind kind;
+		LogKindSet kinds;
 
 		/**
 		 * Targets to which the matched log records will be dispatched.
@@ -620,13 +686,14 @@ namespace MessirLogger {
 		 * Append a log record to be written to matching targets.
 		 * 
 		 * @param level log level, used for dispatch
-		 * @param kind log type, used for dispatch e.g. TECHNICAL = for developers
-		 * @param log_message message content of the entry
-		 * @param module_name name of the module taht emitted the log record
+		 * @param kinds log type set, used for dispatch e.g. TECHNICAL = for developers
+		 * @param message message content of the entry
+		 * @param module_name name of the module that emitted the log record
+		 * @param source source location of method call
 		 * @param source_entity default value of "", corresponds to context of log
 		 */
-		void Log_entry(LogLevel log_level, LogKind log_kind,
-			std::string log_message,
+		void Log_entry(LogLevel level, LogKindSet kinds,
+			std::string message,
 			std::string module_name,
 			std::source_location source,
 			std::string source_entity = "");
@@ -670,9 +737,9 @@ private:
 	MessirLogger::LogLevel _level;
 
 	/**
-	 * Log kind of this record.
+	 * Log kinds of this record.
 	 */
-	MessirLogger::LogKind _kind;
+	MessirLogger::LogKindSet _kinds;
 
 	/**
 	 * Name of the module that emitted the log record.
@@ -700,9 +767,9 @@ private:
 	MessirLogger::Logger& _logger;
 
 public:
-	log_line(MessirLogger::LogLevel level, MessirLogger::LogKind kind,
+	log_line(MessirLogger::LogLevel level, MessirLogger::LogKindSet kinds,
 		std::string module_name, std::source_location source, std::string entity, MessirLogger::Logger& logger)
-		: _level(level), _kind(kind), _module_name(module_name), _source(source),
+		: _level(level), _kinds(kinds), _module_name(module_name), _source(source),
 		_entity(entity), _logger(logger)
 	{}
 

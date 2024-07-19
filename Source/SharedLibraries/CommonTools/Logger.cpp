@@ -27,19 +27,122 @@ namespace MessirLogger {
 		}
 	}
 
-	std::string Log_kind_to_string(LogKind kind) {
-		switch (kind) {
-		case LogKind::KIND_ALL: return "ALL";
-		case LogKind::KIND_TECHNICAL: return "TECHNICAL";
-		case LogKind::KIND_ACTION: return "ACTION";
-		case LogKind::KIND_EVENT: return "EVENT";
-		default: return "UNKNOWN";
+	LogKindSet::LogKindSet() : _bits(0) {}
+
+	LogKindSet::LogKindSet(LogKind kind) : _bits(0) {
+		this->Set(kind);
+	}
+
+	LogKindSet::LogKindSet(std::initializer_list<LogKind> kinds) : _bits(0) {
+
+		for (LogKind kind : kinds) {
+			this->Set(kind);
 		}
 	}
 
+	LogKindSet::LogKindSet(size_t bits) : _bits(bits) {}
+
+	LogKindSet::LogKindSet(const LogKindSet& kinds) : _bits(kinds._bits) {}
+
+	void LogKindSet::Set(LogKind kind) {
+		_bits |= (1 << static_cast<size_t>(kind));
+	}
+
+	bool LogKindSet::Test(LogKind kind) const {
+		return _bits & (1 << static_cast<size_t>(kind));
+	}
+
+	void LogKindSet::Set_all() {
+		_bits = (1 << static_cast<size_t>(LogKind::LOG_KIND_COUNT)) - 1;
+	}
+
+	LogKindSet& LogKindSet::All_set() {
+		_bits = (1 << static_cast<size_t>(LogKind::LOG_KIND_COUNT)) - 1;
+		return *this;
+	}
+
+	size_t LogKindSet::Count() const {
+		size_t count = 0;
+		for (size_t i = 0; i < static_cast<size_t>(LogKind::LOG_KIND_COUNT); ++i) {
+			if (_bits & (1 << i)) {
+				++count;
+			}
+		}
+		return count;
+	}
+
+	bool LogKindSet::Any() const {
+		return _bits != 0;
+	}
+
+	bool LogKindSet::All() const {
+		return _bits == ((1 << static_cast<size_t>(LogKind::LOG_KIND_COUNT)) - 1);
+	}
+
+	std::string LogKindSet::To_string() const {
+
+		if (this->All()) {
+			return "ALL";
+		}
+
+		std::vector<std::string> log_kind_names;
+
+		if (this->Test(LogKind::KIND_TECHNICAL)) {
+			log_kind_names.push_back("TECHNICAL");
+		}
+
+		if (this->Test(LogKind::KIND_ACTION)) {
+			log_kind_names.push_back("ACTION");
+		}
+
+		if (this->Test(LogKind::KIND_EVENT)) {
+			log_kind_names.push_back("EVENT");
+		}
+
+		size_t no_unknowns = this->Count() - log_kind_names.size();
+		if (no_unknowns > 0) {
+			log_kind_names.push_back(std::to_string(no_unknowns) + " UNKNOWN KINDS");
+		}
+
+		std::string output;
+		for (size_t i = 0; i < log_kind_names.size(); ++i) {
+			if (i > 0) {
+				output += ",";
+			}
+
+			output += log_kind_names[i];
+		}
+
+		return output;
+	}
+
+	LogKindSet& LogKindSet::operator=(size_t val) {
+		_bits = val;
+		return *this;
+	}
+
+	LogKindSet LogKindSet::operator&(const LogKindSet& other) const {
+		LogKindSet result;
+		result._bits = _bits & other._bits;
+		return result;
+	}
+
+	bool operator==(const LogKindSet& lhs, const LogKindSet& rhs) {
+		return lhs._bits == rhs._bits;
+	}
+
+	void LogKindSet::Serialize(JSONSerializer& serializer) {
+		serializer << *this;
+	}
+
+	void LogKindSet::Deserialize(JSONSerializer& serializer) {
+		serializer >> *this;
+	}
+
+
 	bool operator==(const LogRecord& lhs, const LogRecord& rhs) {
 		return lhs.level == rhs.level &&
-			lhs.kind == rhs.kind &&
+			lhs.kinds == rhs.kinds &&
 			lhs.module_name == rhs.module_name &&
 			lhs.source.file_name() == rhs.source.file_name() &&
 			lhs.source.line() == rhs.source.line() &&
@@ -58,7 +161,7 @@ namespace MessirLogger {
 	}
 
 	bool operator==(const DispatchEntry& lhs, const DispatchEntry& rhs) {
-		return lhs.kind == rhs.kind &&
+		return lhs.kinds == rhs.kinds &&
 			lhs.level == rhs.level &&
 			lhs.targets == rhs.targets;
 	}
@@ -167,7 +270,7 @@ namespace MessirLogger {
 
 		const std::unordered_map<std::string, std::string> replacements {
 			{ "%%level", Log_level_to_string(record.level) },
-			{ "%%kind",  Log_kind_to_string(record.kind) },
+			{ "%%kinds",  record.kinds.To_string()},
 			{ "%%module",  record.module_name },
 			{ "%%source",  [&]() {
 				std::string fullpath = record.source.file_name();
@@ -414,8 +517,8 @@ namespace MessirLogger {
 		// collect a set of unique targets from dispatch keys which match filter
 		for (const DispatchKey& dispatch_key : _dispatch_keys) {
 
-			if ((dispatch_key.kind == LogKind::KIND_ALL || record.kind == LogKind::KIND_ALL ||
-				record.kind == dispatch_key.kind) &&
+			if ((dispatch_key.kinds.All() || record.kinds.All() ||
+				(dispatch_key.kinds & record.kinds).Any()) &&
 				static_cast<int>(record.level) >= static_cast<int>(dispatch_key.level))
 			{
 				for (const std::shared_ptr<Target>& target : dispatch_key.targets) {
@@ -465,7 +568,7 @@ namespace MessirLogger {
 		for (const DispatchKey& key : _dispatch_keys) {
 			DispatchEntry entry;
 			entry.level = key.level;
-			entry.kind = key.kind;
+			entry.kinds = key.kinds;
 
 			for (const std::shared_ptr <Target>& target : key.targets) {
 				entry.targets.insert(target->Get_target_name());
@@ -504,12 +607,12 @@ namespace MessirLogger {
 				std::find_if(_dispatch_keys.begin(), _dispatch_keys.end(),
 					[&](const DispatchKey& key) {
 						return key.level == dispatch_entry.level &&
-							key.kind == dispatch_entry.kind;
+							key.kinds == dispatch_entry.kinds;
 					});
 
 			if (it_existing_key == _dispatch_keys.end()) {
 				it_existing_key = _dispatch_keys.emplace(_dispatch_keys.end(),
-					dispatch_entry.level, dispatch_entry.kind);
+					dispatch_entry.level, dispatch_entry.kinds);
 			}
 
 			for (const std::string& target_name : dispatch_entry.targets) {
@@ -521,9 +624,9 @@ namespace MessirLogger {
 
 				if (it_target == _targets.end()) {
 					std::cerr << "[ERROR] \"" << target_name <<
-						"\" could not be found, check dispatch keys with" << "[level,kind]=["
+						"\" could not be found, check dispatch keys with" << "[level,kinds]=["
 						<< Log_level_to_string(dispatch_entry.level) <<
-						"," << Log_kind_to_string(dispatch_entry.kind) << "]." << std::endl;
+						"," << dispatch_entry.kinds.To_string() << "]." << std::endl;
 					continue;
 				}
 
@@ -575,18 +678,18 @@ namespace MessirLogger {
 		}
 	}
 
-	void Logger::Log_entry(LogLevel log_level, LogKind log_kind, std::string log_message,
-		std::string module_name, std::source_location source, std::string source_entity)
+	void Logger::Log_entry(LogLevel level, LogKindSet kinds,	std::string message,
+		std::string module_name, std::source_location source,	std::string source_entity)
 	{
 		std::unique_lock<std::recursive_mutex> logger_lock(_logger_mutex);
 		if (_asynchronous_mode) {
-			_log_records.emplace_back(log_level, log_kind, module_name, source, source_entity,
-				log_message, std::chrono::system_clock::now());
+			_log_records.emplace_back(level, kinds, module_name, source, source_entity,
+				message, std::chrono::system_clock::now());
 			_logging_smph.release();
 		}
 		else {
-			Write_log(LogRecord(log_level, log_kind, module_name, source, source_entity,
-				log_message, std::chrono::system_clock::now()));
+			Write_log(LogRecord(level, kinds, module_name, source, source_entity,
+				message, std::chrono::system_clock::now()));
 		}
 	}
 
@@ -616,7 +719,7 @@ namespace MessirLogger {
 					std::make_shared<MessirLogger::FileTargetConfig>("MssTraceFile", "", "", ""),
 				},
 				{
-					{MessirLogger::LogLevel::LEVEL_DEBUG, MessirLogger::LogKind::KIND_ALL, {"MssStdOut", "MssTraceFile"}}
+					{MessirLogger::LogLevel::LEVEL_DEBUG, MessirLogger::LogKindSet().All_set(), {"MssStdOut", "MssTraceFile"}}
 				}
 			);
 
@@ -647,7 +750,7 @@ namespace MessirLogger {
 } // namespace MessirLogger
 
 log_line::~log_line() {
-	_logger.Log_entry(_level, _kind, this->str(), _module_name, _source, _entity);
+	_logger.Log_entry(_level, _kinds, this->str(), _module_name, _source, _entity);
 }
 
 void log_line::Format(const char* format, ...) {
