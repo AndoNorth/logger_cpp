@@ -557,6 +557,21 @@ namespace MessirLogger {
 		}
 	}
 
+	const LoggerConfig& Logger::Get_default_config() {
+
+		static const LoggerConfig default_config(
+			{
+				std::make_shared<MessirLogger::TargetConfig>("MssStdOut", "", MessirLogger::TargetType::SYSTEM_OUT_TARGET),
+				std::make_shared<MessirLogger::FileTargetConfig>("MssTraceFile", "", "", ""),
+			},
+			{
+				{MessirLogger::LogLevel::LEVEL_DEBUG, MessirLogger::LogKindSet().All_set(), {"MssStdOut", "MssTraceFile"}}
+			}
+		);
+
+		return default_config;
+	}
+
 	LoggerConfig Logger::Get_config() {
 
 		LoggerConfig config;
@@ -709,43 +724,54 @@ namespace MessirLogger {
 	}
 
 	void Logger::Load_config(std::string filename) {
+		
 		if (!std::filesystem::exists(filename)) {
-			
-			std::cout << "[WARNING] Load_config \"" << filename << "\" was not found, configured using default_config" << std::endl;
-
-			static MessirLogger::LoggerConfig default_config(
-				{
-					std::make_shared<MessirLogger::TargetConfig>("MssStdOut", "", MessirLogger::TargetType::SYSTEM_OUT_TARGET),
-					std::make_shared<MessirLogger::FileTargetConfig>("MssTraceFile", "", "", ""),
-				},
-				{
-					{MessirLogger::LogLevel::LEVEL_DEBUG, MessirLogger::LogKindSet().All_set(), {"MssStdOut", "MssTraceFile"}}
-				}
-			);
-
-			this->Configure(default_config);
+			std::cout << "[WARNING] Load_config \"" << filename << "\" was not found, configuring using default config" << std::endl;
+			this->Configure(Logger::Get_default_config());
 			return;
 		}
 
-		std::string contents;
 		std::ifstream file(filename);
-		if (file.is_open()) {
-			while (getline(file, contents)) {
-				// std::cout << contents << '\n';
-			}
-		}
-		else {
-			// throw std::filesystem::filesystem_error("Failed to open file \"" + filename + "\"",
-			// 	std::make_error_code(std::errc::no_such_file_or_directory));
-			std::cout << "[WARNING] Load_config could not open config file \"" << filename << "\"" << std::endl;
+		if (!file.is_open()) {
+			std::cout << "[WARNING] Load_config could not open config file \"" << filename << "\", configuring using default config" << std::endl;
+			this->Configure(Logger::Get_default_config());
 			return;
 		}
+
+		std::string contents((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
 		file.close();
-		JSONSerializer tmp_serializer;
-		tmp_serializer.m_json = nlohmann::json::parse(contents);
-		LoggerConfig config;
-		config.Deserialize(tmp_serializer);
-		this->Configure(config);
+
+		if (!contents.empty()) {
+
+			JSONSerializer tmp_serializer;
+			try {
+				
+				tmp_serializer.m_json = nlohmann::json::parse(contents);
+				LoggerConfig config;
+				config.Deserialize(tmp_serializer);
+				this->Configure(config);
+				// std::cout << "contents:" << contents << std::endl;
+				std::cout << "[INFO] Load_config successfully loaded config file \"" << filename << "\"" << std::endl;
+			}
+			catch (const std::exception& e) {
+
+				std::string backup_filename = filename + ".corrupted";
+				int idx = 0;
+				while (std::filesystem::exists(backup_filename)) {
+					backup_filename = filename + ".corrupted" + std::to_string(idx);
+					idx++;
+				}
+
+				std::filesystem::rename(filename, backup_filename);
+				std::cout << "[WARNING] Load_config could not deserialize config file \"" << filename
+					<< "\", renamed to \"" << backup_filename << "\", configuring using default config" << std::endl;
+
+				this->Configure(Logger::Get_default_config());
+			}
+		} else {
+			std::cout << "[WARNING] Load_config found empty config file \"" << filename << "\", configuring using default config" << std::endl;
+			this->Configure(Logger::Get_default_config());
+		}
 	}
 } // namespace MessirLogger
 

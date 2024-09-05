@@ -71,7 +71,7 @@
 
 
 namespace MessirLogger {
-	
+
 	/**
 	 * Represents the log level, used for filtering log records
 	 * based on severity, uses an order comparison.
@@ -581,6 +581,7 @@ namespace MessirLogger {
 		 */
 		std::vector<LogRecord> _log_records;
 
+
 	private:
 
 		/**
@@ -646,6 +647,13 @@ namespace MessirLogger {
 		 * Stop the logger.
 		 */
 		void Stop();
+
+		/**
+		 * Get the default configuration for the logger.
+		 *
+		 * @return default logger config
+		 */
+		static const LoggerConfig& Get_default_config();
 
 		/**
 		 * Get the logger configuration (for serialization).
