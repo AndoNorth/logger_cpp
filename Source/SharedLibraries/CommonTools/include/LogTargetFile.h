@@ -58,6 +58,8 @@ namespace MessirLogger {
 			const std::string& suffix = "",
 			const std::string& filename_format = "");
 
+		nlohmann::json Get_schema() const;
+		virtual void Validate(JSONSerializer& serializer) override;
 		virtual void Serialize(JSONSerializer& serializer) override;
 		virtual void Deserialize(JSONSerializer& serializer) override;
 

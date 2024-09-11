@@ -10,6 +10,7 @@
 #include <thread>
 #include <iostream>
 
+
 COMMONTOOLS_EXPORT MessirLogger::Logger __logger;
 
 namespace MessirLogger {
@@ -18,7 +19,7 @@ namespace MessirLogger {
 	std::string Log_level_to_string(LogLevel level) {
 		switch (level) {
 		case LogLevel::LEVEL_DEBUG: return "DEBUG";
-		case LogLevel::LEVEL_INFO:	return "INFO";
+		case LogLevel::LEVEL_INFO: return "INFO";
 		case LogLevel::LEVEL_WARNING: return "WARNING";
 		case LogLevel::LEVEL_ERROR: return "ERROR";
 		case LogLevel::LEVEL_CRITICAL: return "CRTIICAL";
@@ -151,13 +152,48 @@ namespace MessirLogger {
 		// do we want to check the time also?
 	}
 
+	void DispatchEntry::Validate(JSONSerializer& serializer) {
+		nlohmann::json schema = this->Get_schema();
+		nlohmann::json_schema::json_validator validator;
+		validator.set_root_schema(schema);
+		try {
+			validator.validate(serializer.m_json);
+		}
+		catch (const std::exception e) {
+			throw std::runtime_error("[WARNING] validation failed: " + std::string(e.what()));
+		}
+	}
+
+	nlohmann::json DispatchEntry::Get_schema() const {
+		return R"({
+            "type": "object",
+            "properties": {
+                "level": { "type": "number" },
+                "kinds": { "type": "object" },
+                "targets": { "type": "array" }
+            },
+            "required": ["level", "kinds", "targets"]
+        })"_json;
+	}
 
 	void DispatchEntry::Serialize(JSONSerializer& serializer) {
-		serializer << *this;
+		try {
+			serializer << *this;
+			this->Validate_after_serialize(serializer);
+		}
+		catch (const std::exception e) {
+			throw std::runtime_error(std::string(e.what()));
+		}
 	}
 
 	void DispatchEntry::Deserialize(JSONSerializer& serializer) {
-		serializer >> *this;
+		try {
+			this->Validate_before_deserialize(serializer);
+			serializer >> *this;
+		}
+		catch (const std::exception e) {
+			throw std::runtime_error(std::string(e.what()));
+		}
 	}
 
 	bool operator==(const DispatchEntry& lhs, const DispatchEntry& rhs) {
@@ -198,12 +234,48 @@ namespace MessirLogger {
 		return result;
 	}
 
+	void TargetConfig::Validate(JSONSerializer& serializer) {
+		nlohmann::json schema = this->Get_schema();
+		nlohmann::json_schema::json_validator validator;
+		validator.set_root_schema(schema);
+		try {
+			validator.validate(serializer.m_json);
+		}
+		catch (const std::exception e) {
+			throw std::runtime_error("[WARNING] validation failed: " + std::string(e.what()));
+		}
+	}
+
+	nlohmann::json TargetConfig::Get_schema() const {
+		return R"({
+            "type": "object",
+            "properties": {
+                "target_name": { "type": "string" },
+                "format_string": { "type": "string" },
+                "target_type": { "type": "number" }
+            },
+            "required": ["target_name", "format_string", "target_type"]
+        })"_json;
+	}
+
 	void TargetConfig::Serialize(JSONSerializer& serializer) {
-		serializer << *this;
+		try {
+			serializer << *this;
+			this->Validate_after_serialize(serializer);
+		}
+		catch (const std::exception e) {
+			throw std::runtime_error(std::string(e.what()));
+		}
 	}
 
 	void TargetConfig::Deserialize(JSONSerializer& serializer) {
-		serializer >> *this;
+		try {
+			this->Validate_before_deserialize(serializer);
+			serializer >> *this;
+		}
+		catch (const std::exception e) {
+			throw std::runtime_error(std::string(e.what()));
+		}
 	}
 
 	bool operator==(const TargetConfig& lhs, const TargetConfig& rhs) {
@@ -226,12 +298,46 @@ namespace MessirLogger {
 				});
 	}
 
+	void LoggerConfig::Validate(JSONSerializer& serializer) {
+		nlohmann::json schema = this->Get_schema();
+		nlohmann::json_schema::json_validator validator;
+		validator.set_root_schema(schema);
+		try {
+			validator.validate(serializer.m_json);
+		} catch (const std::exception e) {
+			throw std::runtime_error("[WARNING] validation failed: " + std::string(e.what()));
+		}
+	}
+	
+	nlohmann::json LoggerConfig::Get_schema() const {
+        return R"({
+            "type": "object",
+            "properties": {
+                "targets": { "type": "array" },
+                "dispatch": { "type": "array" },
+                "use_fallback": { "type": "boolean" },
+                "asynchronous_mode": { "type": "boolean" }
+            },
+            "required": ["targets", "dispatch", "use_fallback", "asynchronous_mode"]
+        })"_json;
+	}
+
 	void LoggerConfig::Serialize(JSONSerializer& serializer) {
-		serializer << *this;
+		try {
+			serializer << *this;
+			this->Validate_after_serialize(serializer);
+		} catch (const std::exception e) {
+			throw std::runtime_error(std::string(e.what()));
+		}
 	}
 
 	void LoggerConfig::Deserialize(JSONSerializer& serializer) {
-		serializer >> *this;
+		try {
+			this->Validate_before_deserialize(serializer);
+			serializer >> *this;
+		} catch (const std::exception e) {
+			throw std::runtime_error(std::string(e.what()));
+		}
 	}
 
 	std::chrono::system_clock::time_point Convert_system_clock_to_UTC(
@@ -531,7 +637,7 @@ namespace MessirLogger {
 			
 			TargetResult res = target->Write_log(record);
 
-			if (!res.success && !_fallback_target) {
+			if (!res.success && _fallback_target) {
 
 				LogRecord fallback_record(record);
 				fallback_record.source_entity =
@@ -710,7 +816,14 @@ namespace MessirLogger {
 
 	void Logger::Save_config(std::string filename) {
 		JSONSerializer tmp_serializer;
-		this->Get_config().Serialize(tmp_serializer);
+		try {
+			this->Get_config().Serialize(tmp_serializer);
+		} catch (const std::exception& e) {
+			std::cout << "[WARNING] Save_config could not serialize config, \"" << filename
+				<< "\", renamed to \"" << this->Backup_config(filename) << "\", saving default config" << std::endl;
+			LoggerConfig tmp_config = Logger::Get_default_config();
+			tmp_config.Serialize(tmp_serializer);
+		}
 		std::string contents = tmp_serializer.m_json.dump();
 		std::ofstream file(filename);
 		if (!file.is_open()) {
@@ -743,35 +856,37 @@ namespace MessirLogger {
 
 		if (!contents.empty()) {
 
-			JSONSerializer tmp_serializer;
+			// std::cout << "contents:" << contents << std::endl;
 			try {
-				
+
+				JSONSerializer tmp_serializer;
 				tmp_serializer.m_json = nlohmann::json::parse(contents);
 				LoggerConfig config;
 				config.Deserialize(tmp_serializer);
 				this->Configure(config);
-				// std::cout << "contents:" << contents << std::endl;
 				std::cout << "[INFO] Load_config successfully loaded config file \"" << filename << "\"" << std::endl;
 			}
 			catch (const std::exception& e) {
 
-				std::string backup_filename = filename + ".corrupted";
-				int idx = 0;
-				while (std::filesystem::exists(backup_filename)) {
-					backup_filename = filename + ".corrupted" + std::to_string(idx);
-					idx++;
-				}
-
-				std::filesystem::rename(filename, backup_filename);
 				std::cout << "[WARNING] Load_config could not deserialize config file \"" << filename
-					<< "\", renamed to \"" << backup_filename << "\", configuring using default config" << std::endl;
-
+					<< "\", renamed to \"" << this->Backup_config(filename) << "\", configuring using default config" << std::endl;
 				this->Configure(Logger::Get_default_config());
 			}
 		} else {
 			std::cout << "[WARNING] Load_config found empty config file \"" << filename << "\", configuring using default config" << std::endl;
 			this->Configure(Logger::Get_default_config());
 		}
+	}
+	std::string Logger::Backup_config(std::string filename) {
+		std::string backup_filename = filename + ".corrupted";
+		int idx = 0;
+		while (std::filesystem::exists(backup_filename)) {
+			backup_filename = filename + ".corrupted" + std::to_string(idx);
+			idx++;
+		}
+
+		std::filesystem::rename(filename, backup_filename);
+		return backup_filename;
 	}
 } // namespace MessirLogger
 

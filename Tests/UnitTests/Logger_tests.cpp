@@ -9,6 +9,7 @@
 #include <Logger.h>
 #include <LogTargetFile.h>
 #include <CommonToolsMisc.h>
+#include <nlohmann/json-schema.hpp>
 
 /**
  * referenced from trace.cpp in linux build for trace.Format().
@@ -183,6 +184,51 @@ TEST_F(LoggerConfigurationUTests, JSON_serialization_with_empty) {
 	// NOTE: default values may be filled in the output file, but not in this string comparison
 	const std::string expected_contents = "{\"asynchronous_mode\":false,\"dispatch\":[],\"targets\":[],\"use_fallback\":false}";
 	ASSERT_EQ(expected_contents, contents);
+}
+
+TEST_F(Logger_configuration_tests, Configuration_JSONValidation_good) {
+
+	JSONSerializer serializer;
+	try {
+		test_config.Serialize(serializer);
+		//std::cout << "validation success" << std::endl;
+		ASSERT_TRUE(true);
+	} catch (const std::exception e) {
+		//std::cout << "validation failed: " << e.what() << std::endl;
+		ASSERT_TRUE(false);
+	}
+	nlohmann::json_schema::json_validator validator;
+	validator.set_root_schema(test_config.Get_schema());
+	//std::cout << "schema:" << v_schema.dump() << std::endl;
+	//std::cout << "test_json" << serializer.m_json.dump() << std::endl;
+}
+
+TEST_F(Logger_configuration_tests, Configuration_JSONValidation_bad) {
+
+	nlohmann::json v_schema(R"({
+            "type": "object",
+            "properties": {
+                "targets": { "type": "number" },
+                "dispatch": { "type": "array" },
+                "use_fallback": { "type": "boolean" },
+                "asynchronous_mode": { "type": "boolean" }
+            },
+            "required": ["targets", "dispatch", "use_fallback", "asynchronous_mode"]
+        })"_json);
+	JSONSerializer serializer;
+	test_config.Serialize(serializer);
+	nlohmann::json_schema::json_validator validator;
+	validator.set_root_schema(v_schema);
+	//std::cout << "schema:" << v_schema.dump() << std::endl;
+	//std::cout << "test_json" << serializer.m_json.dump() << std::endl;
+	try {
+		validator.validate(serializer.m_json);
+		//std::cout << "validation success" << std::endl;
+		ASSERT_FALSE(true);
+	} catch (const std::exception e) {
+		//std::cout << "validation failed: " << e.what() << std::endl;
+		ASSERT_FALSE(false);
+	}
 }
 /**
  * test configuration persistence

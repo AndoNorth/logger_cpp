@@ -19,6 +19,7 @@
 
 #include <SerializerJSON.h>
 #include <RegistrySettings.h>
+#include <nlohmann/json-schema.hpp>
 
 /*
  * Macros for logging, example usage:
@@ -254,13 +255,17 @@ namespace MessirLogger {
 			: level(level), kinds(kinds), targets(targets)
 		{}
 
+		nlohmann::json Get_schema() const;
+		virtual void Validate(JSONSerializer& serializer) override;
 		virtual void Serialize(JSONSerializer& serializer) override;
 		virtual void Deserialize(JSONSerializer& serializer) override;
 
 		auto GetExposedMembers() {
 			return members(
 				member("level", &DispatchEntry::level, this),
-				member("kinds", &DispatchEntry::kinds, this), // TODO@FIX: this results in std::bitset<N> as T, which is not able to considered by json
+				// TODO@FIX: this results in std::bitset<N> as T, which is not able to considered by json.
+				// we can add it in the following method GetSchema(), defined in SerializerJSON.h
+				member("kinds", &DispatchEntry::kinds, this),
 				member("targets", &DispatchEntry::targets, this)
 			);
 		}
@@ -324,6 +329,8 @@ namespace MessirLogger {
 		 */
 		static TargetConfig* AllocateFromJSON(const nlohmann::json& _json);
 
+		nlohmann::json Get_schema() const;
+		virtual void Validate(JSONSerializer& serializer) override;
 		virtual void Serialize(JSONSerializer& serializer) override;
 		virtual void Deserialize(JSONSerializer& serializer) override;
 
@@ -380,6 +387,9 @@ namespace MessirLogger {
 			: _target_configs(targets), _dispatch_config(dispatches), _use_fallback(use_fallback), _asynchronous_mode(async_mode)
 		{}
 
+
+		nlohmann::json Get_schema() const;
+		virtual void Validate(JSONSerializer& serializer) override;
 		virtual void Serialize(JSONSerializer& serializer) override;
 		virtual void Deserialize(JSONSerializer& serializer) override;
 
@@ -709,16 +719,20 @@ namespace MessirLogger {
 		/**
 		 * Persist config to file system.
 		 * 
-		 * @param filename output file target, includes path
+		 * @param filename output file target
 		 */
 		void Save_config(std::string filename);
 
 		/**
 		 * Load config from file system.
 		 *
-		 * @param filename input file target, includes path
+		 * @param filename input file target
 		 */
 		void Load_config(std::string filename);
+		/**
+		 *
+		 */
+		std::string Backup_config(std::string filename);
 
 	};
 }

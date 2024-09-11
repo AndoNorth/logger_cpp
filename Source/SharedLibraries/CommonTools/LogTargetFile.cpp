@@ -35,12 +35,63 @@ namespace MessirLogger {
 		}
 	}
 
+	void FileTargetConfig::Validate(JSONSerializer& serializer) {
+		nlohmann::json schema = this->Get_schema();
+		nlohmann::json_schema::json_validator validator;
+		validator.set_root_schema(schema);
+		try {
+			validator.validate(serializer.m_json);
+		}
+		catch (const std::exception e) {
+			throw std::runtime_error("[WARNING] validation failed: " + std::string(e.what()));
+		}
+	}
+
+	nlohmann::json FileTargetConfig::Get_schema() const {
+
+		nlohmann::json base_schema = TargetConfig::Get_schema();
+
+		nlohmann::json derived_schema = R"({
+			"type": "object",
+			"properties": {
+				"filepath": { "type": "string" },
+				"filename": { "type": "string" },
+				"max_filesize": { "type": "number" },
+				"log_frequency": { "type": "number" },
+				"prefix": { "type": "string" },
+				"suffix": { "type": "string" },
+				"filename_format": { "type": "string" }
+			},
+			"required": ["filepath", "filename", "max_filesize", "log_frequency", "prefix", "suffix", "filename_format"]
+		})"_json;
+
+		base_schema["properties"].update(derived_schema["properties"]);
+
+		for (const auto& required_field : derived_schema["required"]) {
+			base_schema["required"].push_back(required_field);
+		}
+
+		return base_schema;
+	}
+
 	void FileTargetConfig::Serialize(JSONSerializer& serializer) {
-		serializer << *this;
+		try {
+			serializer << *this;
+			this->Validate_after_serialize(serializer);
+		}
+		catch (const std::exception e) {
+			throw std::runtime_error(std::string(e.what()));
+		}
 	}
 
 	void FileTargetConfig::Deserialize(JSONSerializer& serializer) {
-		serializer >> *this;
+		try {
+			this->Validate_before_deserialize(serializer);
+			serializer >> *this;
+		}
+		catch (const std::exception e) {
+			throw std::runtime_error(std::string(e.what()));
+		}
 	}
 
 	// target
