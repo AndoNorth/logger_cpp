@@ -42,7 +42,7 @@ namespace MessirLogger {
 		try {
 			validator.validate(serializer.m_json);
 		}
-		catch (const std::exception e) {
+		catch (const std::exception& e) {
 			throw std::runtime_error("[WARNING] validation failed: " + std::string(e.what()));
 		}
 	}
@@ -79,7 +79,7 @@ namespace MessirLogger {
 			serializer << *this;
 			this->Validate_after_serialize(serializer);
 		}
-		catch (const std::exception e) {
+		catch (const std::exception& e) {
 			throw std::runtime_error(std::string(e.what()));
 		}
 	}
@@ -89,7 +89,7 @@ namespace MessirLogger {
 			this->Validate_before_deserialize(serializer);
 			serializer >> *this;
 		}
-		catch (const std::exception e) {
+		catch (const std::exception& e) {
 			throw std::runtime_error(std::string(e.what()));
 		}
 	}

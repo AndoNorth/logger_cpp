@@ -186,24 +186,15 @@ TEST_F(LoggerConfigurationUTests, JSON_serialization_with_empty) {
 	ASSERT_EQ(expected_contents, contents);
 }
 
-TEST_F(Logger_configuration_tests, Configuration_JSONValidation_good) {
+TEST_F(LoggerConfigurationUTests, JSONValidation_with_all_targets_good) {
 
 	JSONSerializer serializer;
-	try {
-		test_config.Serialize(serializer);
-		//std::cout << "validation success" << std::endl;
-		ASSERT_TRUE(true);
-	} catch (const std::exception e) {
-		//std::cout << "validation failed: " << e.what() << std::endl;
-		ASSERT_TRUE(false);
-	}
-	nlohmann::json_schema::json_validator validator;
-	validator.set_root_schema(test_config.Get_schema());
-	//std::cout << "schema:" << v_schema.dump() << std::endl;
-	//std::cout << "test_json" << serializer.m_json.dump() << std::endl;
+	ASSERT_NO_THROW({
+		_test_config.Serialize(serializer);
+	});
 }
 
-TEST_F(Logger_configuration_tests, Configuration_JSONValidation_bad) {
+TEST_F(LoggerConfigurationUTests, JSONValidation_with_all_targets_bad) {
 
 	nlohmann::json v_schema(R"({
             "type": "object",
@@ -216,19 +207,13 @@ TEST_F(Logger_configuration_tests, Configuration_JSONValidation_bad) {
             "required": ["targets", "dispatch", "use_fallback", "asynchronous_mode"]
         })"_json);
 	JSONSerializer serializer;
-	test_config.Serialize(serializer);
+	_test_config.Serialize(serializer);
 	nlohmann::json_schema::json_validator validator;
 	validator.set_root_schema(v_schema);
-	//std::cout << "schema:" << v_schema.dump() << std::endl;
-	//std::cout << "test_json" << serializer.m_json.dump() << std::endl;
-	try {
+
+	ASSERT_ANY_THROW({
 		validator.validate(serializer.m_json);
-		//std::cout << "validation success" << std::endl;
-		ASSERT_FALSE(true);
-	} catch (const std::exception e) {
-		//std::cout << "validation failed: " << e.what() << std::endl;
-		ASSERT_FALSE(false);
-	}
+	});
 }
 /**
  * test configuration persistence

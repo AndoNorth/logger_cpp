@@ -256,7 +256,6 @@ namespace MessirLogger {
 		{}
 
 		nlohmann::json Get_schema() const;
-		virtual void Validate(JSONSerializer& serializer) override;
 		virtual void Serialize(JSONSerializer& serializer) override;
 		virtual void Deserialize(JSONSerializer& serializer) override;
 
@@ -269,6 +268,9 @@ namespace MessirLogger {
 				member("targets", &DispatchEntry::targets, this)
 			);
 		}
+
+	private:
+		virtual void Validate(JSONSerializer& serializer) override;
 	};
 
 	COMMONTOOLS_EXPORT bool operator==(const DispatchEntry& lhs, const DispatchEntry& rhs);
@@ -330,7 +332,6 @@ namespace MessirLogger {
 		static TargetConfig* AllocateFromJSON(const nlohmann::json& _json);
 
 		nlohmann::json Get_schema() const;
-		virtual void Validate(JSONSerializer& serializer) override;
 		virtual void Serialize(JSONSerializer& serializer) override;
 		virtual void Deserialize(JSONSerializer& serializer) override;
 
@@ -341,6 +342,9 @@ namespace MessirLogger {
 				member("target_type", &TargetConfig::_target_type, this)
 			);
 		}
+
+	private:
+		virtual void Validate(JSONSerializer& serializer) override;
 	};
 
 	COMMONTOOLS_EXPORT bool operator==(const TargetConfig& lhs, const TargetConfig& rhs);
@@ -389,7 +393,6 @@ namespace MessirLogger {
 
 
 		nlohmann::json Get_schema() const;
-		virtual void Validate(JSONSerializer& serializer) override;
 		virtual void Serialize(JSONSerializer& serializer) override;
 		virtual void Deserialize(JSONSerializer& serializer) override;
 
@@ -405,6 +408,9 @@ namespace MessirLogger {
 		friend COMMONTOOLS_EXPORT bool operator==(const LoggerConfig& lhs, const LoggerConfig& rhs);
 
 		friend class Logger;
+
+	private:
+		virtual void Validate(JSONSerializer& serializer) override;
 	};
 
 	COMMONTOOLS_EXPORT bool operator==(const LoggerConfig& lhs, const LoggerConfig& rhs);
@@ -591,7 +597,6 @@ namespace MessirLogger {
 		 */
 		std::vector<LogRecord> _log_records;
 
-
 	private:
 
 		/**
@@ -729,8 +734,13 @@ namespace MessirLogger {
 		 * @param filename input file target
 		 */
 		void Load_config(std::string filename);
+
 		/**
-		 *
+		 * Backup input filename, loops until a unique name is found
+		 * 
+		 * @param filename input file target
+		 * 
+		 * @return backup_filename output file target
 		 */
 		std::string Backup_config(std::string filename);
 

@@ -10,7 +10,6 @@
 #include <thread>
 #include <iostream>
 
-
 COMMONTOOLS_EXPORT MessirLogger::Logger __logger;
 
 namespace MessirLogger {
@@ -159,7 +158,7 @@ namespace MessirLogger {
 		try {
 			validator.validate(serializer.m_json);
 		}
-		catch (const std::exception e) {
+		catch (const std::exception& e) {
 			throw std::runtime_error("[WARNING] validation failed: " + std::string(e.what()));
 		}
 	}
@@ -181,7 +180,7 @@ namespace MessirLogger {
 			serializer << *this;
 			this->Validate_after_serialize(serializer);
 		}
-		catch (const std::exception e) {
+		catch (const std::exception& e) {
 			throw std::runtime_error(std::string(e.what()));
 		}
 	}
@@ -191,7 +190,7 @@ namespace MessirLogger {
 			this->Validate_before_deserialize(serializer);
 			serializer >> *this;
 		}
-		catch (const std::exception e) {
+		catch (const std::exception& e) {
 			throw std::runtime_error(std::string(e.what()));
 		}
 	}
@@ -241,7 +240,7 @@ namespace MessirLogger {
 		try {
 			validator.validate(serializer.m_json);
 		}
-		catch (const std::exception e) {
+		catch (const std::exception& e) {
 			throw std::runtime_error("[WARNING] validation failed: " + std::string(e.what()));
 		}
 	}
@@ -263,7 +262,7 @@ namespace MessirLogger {
 			serializer << *this;
 			this->Validate_after_serialize(serializer);
 		}
-		catch (const std::exception e) {
+		catch (const std::exception& e) {
 			throw std::runtime_error(std::string(e.what()));
 		}
 	}
@@ -273,7 +272,7 @@ namespace MessirLogger {
 			this->Validate_before_deserialize(serializer);
 			serializer >> *this;
 		}
-		catch (const std::exception e) {
+		catch (const std::exception& e) {
 			throw std::runtime_error(std::string(e.what()));
 		}
 	}
@@ -304,7 +303,7 @@ namespace MessirLogger {
 		validator.set_root_schema(schema);
 		try {
 			validator.validate(serializer.m_json);
-		} catch (const std::exception e) {
+		} catch (const std::exception& e) {
 			throw std::runtime_error("[WARNING] validation failed: " + std::string(e.what()));
 		}
 	}
@@ -326,7 +325,7 @@ namespace MessirLogger {
 		try {
 			serializer << *this;
 			this->Validate_after_serialize(serializer);
-		} catch (const std::exception e) {
+		} catch (const std::exception& e) {
 			throw std::runtime_error(std::string(e.what()));
 		}
 	}
@@ -335,7 +334,7 @@ namespace MessirLogger {
 		try {
 			this->Validate_before_deserialize(serializer);
 			serializer >> *this;
-		} catch (const std::exception e) {
+		} catch (const std::exception& e) {
 			throw std::runtime_error(std::string(e.what()));
 		}
 	}
@@ -877,6 +876,7 @@ namespace MessirLogger {
 			this->Configure(Logger::Get_default_config());
 		}
 	}
+
 	std::string Logger::Backup_config(std::string filename) {
 		std::string backup_filename = filename + ".corrupted";
 		int idx = 0;
