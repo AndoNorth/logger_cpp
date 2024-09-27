@@ -1,5 +1,7 @@
 #include <benchmark/benchmark.h>
 
+#include <TestTools.h>
+
 #include <cmath>
 #include <filesystem>
 
@@ -7,25 +9,35 @@
 #include <StdAfx.h>
 #endif
 
-#include <Trace.h>
 #include <Logger.h>
 #include <LogTargetFile.h>
 
-#include <iostream>
-#include <sstream>
-#include <string>
-
-static void BM_Trace(benchmark::State& state) {
-
-	// while(state.keeprunning())
-	for (auto _ : state) {
-		for (int i = 0; i < state.range(0); i++) {
-			//trace_ << "log message " + std::to_string(i);
-			//benchmark::ClobberMemory();
+/**
+ * custom range from 10^start to 10^end, to avoid computation in test.
+ */
+std::function<void(benchmark::internal::Benchmark*)> Custom_range_power_of_ten(int start, int end) {
+	return [start, end](benchmark::internal::Benchmark* b) {
+		for (int i = start; i <= end; ++i) {
+			b->Args({ static_cast<int>(std::pow(10, i)) });
 		}
-	}
+	};
+}
 
-	state.SetLabel("Write trace n=" + std::to_string(state.range(0)) + " times");
+/**
+ * helper method used to suppress output to stdout
+ *
+ * @param predicate Method where we want to suppress stdout
+ *
+ * @return suppressed_buffer_string the suppressed buffer stream as a string
+*/
+std::string Capture_stdout(std::function<void()> decorated_function) {
+	std::stringbuf suppressed_buffer;
+	std::streambuf* old_buffer = std::cout.rdbuf(&suppressed_buffer);
+
+	decorated_function();
+
+	std::cout.rdbuf(old_buffer);  // Restore the original stream buffer
+	return suppressed_buffer.str();
 }
 
 /**
@@ -140,50 +152,19 @@ void Logger_Write_log(benchmark::State& state, MessirLogger::Logger* logger) {
 	}
 }
 
-/**
- * custom range from 10^start to 10^end, to avoid computation in test.
- */
-std::function<void(benchmark::internal::Benchmark*)> CustomRange_PowerOfTen(int start, int end) {
-	return [start, end](benchmark::internal::Benchmark* b) {
-		for (int i = start; i <= end; ++i) {
-			b->Args({ static_cast<int>(std::pow(10, i)) });
-		}
-	};
-}
-
-class CapturedStreamBuffer : public std::stringbuf {
-public:
-	std::string Get_captured_output() const {
-		return str();
-	}
-};
-
-/**
- * this method is used to supress the logger from printing to stdout
- * , currently has a bug where when 10^5 still outputs to stdout
-*/
-std::string Capture_stdout(std::function<void()> predicate) {
-	CapturedStreamBuffer buffer;
-	std::streambuf* old_buffer = std::cout.rdbuf(&buffer);
-
-	predicate();
-
-	std::cout.rdbuf(old_buffer);  // Restore the original stream buffer
-	return buffer.Get_captured_output();
-}
 
 // tests
-class StandardOutput_sync : public benchmark::Fixture {
+class TargetStandardOutputSync : public benchmark::Fixture {
 public:
-	MessirLogger::Logger* logger;
+	MessirLogger::Logger* _logger;
 
 public:
 	void SetUp(::benchmark::State& state) {
-		logger = new MessirLogger::Logger;
+		_logger = new MessirLogger::Logger;
 		MessirLogger::LoggerConfig default_config(
 			{
 				std::make_shared<MessirLogger::TargetConfig>("StdOut",
-					"[%%level:%%kind] - %%log", MessirLogger::TargetType::SYSTEM_OUT_TARGET),
+					"[%%level:%%kinds] - %%log", MessirLogger::TargetType::SYSTEM_OUT_TARGET),
 			},
 			{
 				{MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKindSet().All_set(), {"StdOut"}},
@@ -191,33 +172,33 @@ public:
 			false,
 			false
 		);
-		logger->Configure(default_config);
-		logger->Start();
+		_logger->Configure(default_config);
+		_logger->Start();
 	}
 
 	void TearDown(::benchmark::State& state) {
-		delete logger;
+		delete _logger;
 	}
 };
 
-BENCHMARK_DEFINE_F(StandardOutput_sync, _)(benchmark::State& state) {
+BENCHMARK_DEFINE_F(TargetStandardOutputSync, BM_Write_log)(benchmark::State& state) {
 	std::string capturedOutput = Capture_stdout([&]() {
-		Logger_Write_log(state, logger);
+		Logger_Write_log(state, _logger);
 	});
 	state.SetLabel("Logs per iteration = " + std::to_string(state.range(0)));
 }
 
-class StandardOutput_async : public benchmark::Fixture {
+class TargetStandardOutputAsync : public benchmark::Fixture {
 public:
-	MessirLogger::Logger* logger;
+	MessirLogger::Logger* _logger;
 
 public:
 	void SetUp(::benchmark::State& state) {
-		logger = new MessirLogger::Logger;
+		_logger = new MessirLogger::Logger;
 		MessirLogger::LoggerConfig default_config(
 			{
 				std::make_shared<MessirLogger::TargetConfig>("StdOut",
-					"[%%level:%%kind] - %%log", MessirLogger::TargetType::SYSTEM_OUT_TARGET),
+					"[%%level:%%kinds] - %%log", MessirLogger::TargetType::SYSTEM_OUT_TARGET),
 			},
 			{
 				{MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKindSet().All_set(), {"StdOut"}},
@@ -225,146 +206,143 @@ public:
 			false,
 			true
 		);
-		logger->Configure(default_config);
-		logger->Start();
+		_logger->Configure(default_config);
+		_logger->Start();
 	}
 
 	void TearDown(::benchmark::State& state) {
-		delete logger;
+		delete _logger;
 	}
 };
 
-BENCHMARK_DEFINE_F(StandardOutput_async, _)(benchmark::State& state) {
+BENCHMARK_DEFINE_F(TargetStandardOutputAsync, BM_Write_log)(benchmark::State& state) {
 	std::string capturedOutput = Capture_stdout([&]() {
-		Logger_Write_log(state, logger);
+		Logger_Write_log(state, _logger);
+		_logger->Stop(); // flushes the remaining log records
 	});
 	state.SetLabel("Logs per iteration = " + std::to_string(state.range(0)));
 }
 
-class FileTarget_sync : public benchmark::Fixture {
+class FileTargetSync : public benchmark::Fixture {
 public:
-	MessirLogger::Logger* logger;
+	MessirLogger::Logger* _logger;
 	std::string expected_filename = "performance_test.log";
 
 public:
 	void SetUp(::benchmark::State& state) {
-		logger = new MessirLogger::Logger;
+		_logger = new MessirLogger::Logger;
 		MessirLogger::LoggerConfig default_config(
 			{
 				std::make_shared<MessirLogger::FileTargetConfig>("FileTarget",
-					"[%%level:%%kind] - %%log", "", "performance_test",
+					"[%%level:%%kinds] - %%log", "./", "performance_test",
 					0, 0, "", "", "%%path%%filename%%suffix"),
 			},
 			{
-				{MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKindSet().All_set(), {"StdOut"}},
+				{MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKindSet().All_set(), {"FileTarget"}},
 			},
 			false,
 			false
 		);
-		logger->Configure(default_config);
-		logger->Start();
+		_logger->Configure(default_config);
+		_logger->Start();
 	}
 
 	void TearDown(::benchmark::State& state) {
-		delete logger;
+		delete _logger;
 		std::filesystem::remove(expected_filename);
 	}
 };
 
-BENCHMARK_DEFINE_F(FileTarget_sync, _)(benchmark::State& state) {
-	Logger_Write_log(state, logger);
+BENCHMARK_DEFINE_F(FileTargetSync, BM_Write_log)(benchmark::State& state) {
+	Logger_Write_log(state, _logger);
 	state.SetLabel("Logs per iteration = "+ std::to_string(state.range(0))
 		+ " , filesize=" + std::to_string(std::filesystem::file_size(expected_filename)));
 }
 
-class FileTarget_async : public benchmark::Fixture {
+class FileTargetAsync : public benchmark::Fixture {
 public:
-	MessirLogger::Logger* logger;
+	MessirLogger::Logger* _logger;
 	std::string expected_filename = "performance_test.log";
 
 public:
 	void SetUp(::benchmark::State& state) {
-		logger = new MessirLogger::Logger;
+		_logger = new MessirLogger::Logger;
 		MessirLogger::LoggerConfig default_config(
 			{
 				std::make_shared<MessirLogger::FileTargetConfig>("FileTarget",
-					"[%%level:%%kind] - %%log", "", "performance_test",
+					"[%%level:%%kinds] - %%log", "./", "performance_test",
 					0, 0, "", "", "%%path%%filename%%suffix"),
 			},
 			{
-				{MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKindSet().All_set(), {"StdOut"}},
+				{MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKindSet().All_set(), {"FileTarget"}},
 			},
 			false,
 			false
 		);
-		logger->Configure(default_config);
-		logger->Start();
+		_logger->Configure(default_config);
+		_logger->Start();
 	}
 
 	void TearDown(::benchmark::State& state) {
-		delete logger;
+		delete _logger;
 		std::filesystem::remove(expected_filename);
 	}
 };
 
-BENCHMARK_DEFINE_F(FileTarget_async, _)(benchmark::State& state) {
-	Logger_Write_log(state, logger);
+BENCHMARK_DEFINE_F(FileTargetAsync, BM_Write_log)(benchmark::State& state) {
+	Logger_Write_log(state, _logger);
+	_logger->Stop(); // flushes the remaining log records
 	state.SetLabel("Logs per iteration = " + std::to_string(state.range(0))
 		+ " , filesize=" + std::to_string(std::filesystem::file_size(expected_filename)));
 }
 
 // tests
-BENCHMARK_REGISTER_F(StandardOutput_sync, _)
+BENCHMARK_REGISTER_F(TargetStandardOutputSync, BM_Write_log)
 ->Apply([](benchmark::internal::Benchmark* b) {
-	CustomRange_PowerOfTen(2, 5)(b);
+	Custom_range_power_of_ten(2, 5)(b);
 });
 
-BENCHMARK_REGISTER_F(StandardOutput_async, _)
+BENCHMARK_REGISTER_F(TargetStandardOutputAsync, BM_Write_log)
 ->Apply([](benchmark::internal::Benchmark* b) {
-	CustomRange_PowerOfTen(2, 5)(b);
+	Custom_range_power_of_ten(2, 5)(b);
 });
 
-BENCHMARK_REGISTER_F(FileTarget_sync, _)
+BENCHMARK_REGISTER_F(FileTargetSync, BM_Write_log)
 ->Apply([](benchmark::internal::Benchmark* b) {
-	CustomRange_PowerOfTen(2, 5)(b);
+	Custom_range_power_of_ten(2, 5)(b);
 });
 
-BENCHMARK_REGISTER_F(FileTarget_async, _)
+BENCHMARK_REGISTER_F(FileTargetAsync, BM_Write_log)
 ->Apply([](benchmark::internal::Benchmark* b) {
-	CustomRange_PowerOfTen(2, 5)(b);
-});
-
-BENCHMARK(BM_Trace)
-->Apply([](benchmark::internal::Benchmark* b) {
-	CustomRange_PowerOfTen(2, 5)(b);
+	Custom_range_power_of_ten(2, 5)(b);
 });
 
 BENCHMARK(BM_Linux_trace_format_int)
 ->Apply([](benchmark::internal::Benchmark* b) {
-	CustomRange_PowerOfTen(2, 5)(b);
+	Custom_range_power_of_ten(2, 5)(b);
 });
 
 BENCHMARK(BM_Linux_trace_format_str)
 ->Apply([](benchmark::internal::Benchmark* b) {
-	CustomRange_PowerOfTen(2, 5)(b);
+	Custom_range_power_of_ten(2, 5)(b);
 });
 
 BENCHMARK(BM_Linux_trace_format_mixed)
 ->Apply([](benchmark::internal::Benchmark* b) {
-	CustomRange_PowerOfTen(2, 5)(b);
+	Custom_range_power_of_ten(2, 5)(b);
 });
 
 BENCHMARK(BM_Windows_trace_format_int)
 ->Apply([](benchmark::internal::Benchmark* b) {
-	CustomRange_PowerOfTen(2, 5)(b);
+	Custom_range_power_of_ten(2, 5)(b);
 });
 
 BENCHMARK(BM_Windows_trace_format_str)
 ->Apply([](benchmark::internal::Benchmark* b) {
-	CustomRange_PowerOfTen(2, 5)(b);
+	Custom_range_power_of_ten(2, 5)(b);
 });
 
 BENCHMARK(BM_Windows_trace_format_mixed)
 ->Apply([](benchmark::internal::Benchmark* b) {
-	CustomRange_PowerOfTen(2, 5)(b);
+	Custom_range_power_of_ten(2, 5)(b);
 });
