@@ -19,6 +19,7 @@
 
 #include <SerializerJSON.h>
 #include <RegistrySettings.h>
+#include <nlohmann/json-schema.hpp>
 
 /*
  * Macros for logging, example usage:
@@ -71,7 +72,7 @@
 
 
 namespace MessirLogger {
-	
+
 	/**
 	 * Represents the log level, used for filtering log records
 	 * based on severity, uses an order comparison.
@@ -254,16 +255,22 @@ namespace MessirLogger {
 			: level(level), kinds(kinds), targets(targets)
 		{}
 
+		nlohmann::json Get_schema() const;
 		virtual void Serialize(JSONSerializer& serializer) override;
 		virtual void Deserialize(JSONSerializer& serializer) override;
 
 		auto GetExposedMembers() {
 			return members(
 				member("level", &DispatchEntry::level, this),
-				member("kinds", &DispatchEntry::kinds, this), // TODO@FIX: this results in std::bitset<N> as T, which is not able to considered by json
+				// TODO@FIX: this results in std::bitset<N> as T, which is not able to considered by json.
+				// we can add it in the following method GetSchema(), defined in SerializerJSON.h
+				member("kinds", &DispatchEntry::kinds, this),
 				member("targets", &DispatchEntry::targets, this)
 			);
 		}
+
+	private:
+		virtual void Validate(JSONSerializer& serializer) override;
 	};
 
 	COMMONTOOLS_EXPORT bool operator==(const DispatchEntry& lhs, const DispatchEntry& rhs);
@@ -324,6 +331,7 @@ namespace MessirLogger {
 		 */
 		static TargetConfig* AllocateFromJSON(const nlohmann::json& _json);
 
+		nlohmann::json Get_schema() const;
 		virtual void Serialize(JSONSerializer& serializer) override;
 		virtual void Deserialize(JSONSerializer& serializer) override;
 
@@ -334,6 +342,9 @@ namespace MessirLogger {
 				member("target_type", &TargetConfig::_target_type, this)
 			);
 		}
+
+	private:
+		virtual void Validate(JSONSerializer& serializer) override;
 	};
 
 	COMMONTOOLS_EXPORT bool operator==(const TargetConfig& lhs, const TargetConfig& rhs);
@@ -380,6 +391,8 @@ namespace MessirLogger {
 			: _target_configs(targets), _dispatch_config(dispatches), _use_fallback(use_fallback), _asynchronous_mode(async_mode)
 		{}
 
+
+		nlohmann::json Get_schema() const;
 		virtual void Serialize(JSONSerializer& serializer) override;
 		virtual void Deserialize(JSONSerializer& serializer) override;
 
@@ -395,6 +408,9 @@ namespace MessirLogger {
 		friend COMMONTOOLS_EXPORT bool operator==(const LoggerConfig& lhs, const LoggerConfig& rhs);
 
 		friend class Logger;
+
+	private:
+		virtual void Validate(JSONSerializer& serializer) override;
 	};
 
 	COMMONTOOLS_EXPORT bool operator==(const LoggerConfig& lhs, const LoggerConfig& rhs);
@@ -648,6 +664,13 @@ namespace MessirLogger {
 		void Stop();
 
 		/**
+		 * Get the default configuration for the logger.
+		 *
+		 * @return default logger config
+		 */
+		static const LoggerConfig& Get_default_config();
+
+		/**
 		 * Get the logger configuration (for serialization).
 		 * 
 		 * @return the logger config
@@ -701,16 +724,25 @@ namespace MessirLogger {
 		/**
 		 * Persist config to file system.
 		 * 
-		 * @param filename output file target, includes path
+		 * @param filename output file target
 		 */
 		void Save_config(std::string filename);
 
 		/**
 		 * Load config from file system.
 		 *
-		 * @param filename input file target, includes path
+		 * @param filename input file target
 		 */
 		void Load_config(std::string filename);
+
+		/**
+		 * Backup input filename, loops until a unique name is found
+		 * 
+		 * @param filename input file target
+		 * 
+		 * @return backup_filename output file target
+		 */
+		std::string Backup_config(std::string filename);
 
 	};
 }

@@ -9,6 +9,7 @@
 #include <Logger.h>
 #include <LogTargetFile.h>
 #include <CommonToolsMisc.h>
+#include <nlohmann/json-schema.hpp>
 
 /**
  * referenced from trace.cpp in linux build for trace.Format().
@@ -183,6 +184,36 @@ TEST_F(LoggerConfigurationUTests, JSON_serialization_with_empty) {
 	// NOTE: default values may be filled in the output file, but not in this string comparison
 	const std::string expected_contents = "{\"asynchronous_mode\":false,\"dispatch\":[],\"targets\":[],\"use_fallback\":false}";
 	ASSERT_EQ(expected_contents, contents);
+}
+
+TEST_F(LoggerConfigurationUTests, JSONValidation_with_all_targets_good) {
+
+	JSONSerializer serializer;
+	ASSERT_NO_THROW({
+		_test_config.Serialize(serializer);
+	});
+}
+
+TEST_F(LoggerConfigurationUTests, JSONValidation_with_all_targets_bad) {
+
+	nlohmann::json v_schema(R"({
+            "type": "object",
+            "properties": {
+                "targets": { "type": "number" },
+                "dispatch": { "type": "array" },
+                "use_fallback": { "type": "boolean" },
+                "asynchronous_mode": { "type": "boolean" }
+            },
+            "required": ["targets", "dispatch", "use_fallback", "asynchronous_mode"]
+        })"_json);
+	JSONSerializer serializer;
+	_test_config.Serialize(serializer);
+	nlohmann::json_schema::json_validator validator;
+	validator.set_root_schema(v_schema);
+
+	ASSERT_ANY_THROW({
+		validator.validate(serializer.m_json);
+	});
 }
 /**
  * test configuration persistence
