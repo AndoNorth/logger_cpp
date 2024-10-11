@@ -1,13 +1,12 @@
-#include <benchmark/benchmark.h>
+#ifdef _WINDOWS
+#include "stdafx.h"
+#endif
 
+#include <benchmark/benchmark.h>
 #include <TestTools.h>
 
 #include <cmath>
 #include <filesystem>
-
-#ifdef _WINDOWS
-#include <StdAfx.h>
-#endif
 
 #include <Logger.h>
 #include <LogTargetFile.h>
