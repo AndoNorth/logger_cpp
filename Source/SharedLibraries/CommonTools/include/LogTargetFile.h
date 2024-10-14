@@ -45,7 +45,7 @@ namespace MessirLogger {
 		/**
 		 * Format of filename.
 		 */
-		std::string _filename_format = "%%path%%prefix%%filename%%title_%%date_%%hour-%%min-%%sec-%%ms_%%pid%%suffix";
+		std::string _filename_format = "%%path%%prefix%%filename%%title_%%date_%%hour-%%min-%%sec-%%ms_%%procname_%%pid%%suffix";
 
 	public:
 		FileTargetConfig(const std::string& name = "undefined", 
@@ -121,7 +121,7 @@ namespace MessirLogger {
 		/**
 		 * Log filename format.
 		 */
-		std::string _filename_format = "%%path%%prefix%%filename%%title_%%date_%%hour-%%min-%%sec-%%ms_%%pid%%suffix";
+		std::string _filename_format = "%%path%%prefix%%filename%%title_%%date_%%hour-%%min-%%sec-%%ms_%%procname_%%pid%%suffix";
 
 		/**
 		 * Current log filename. Changes on each log rotation.

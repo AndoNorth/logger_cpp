@@ -106,7 +106,8 @@ namespace MessirLogger {
 			{ "%%filename", _filename },
 			{ "%%title", (LPCTSTR)MessirReg::Get_string(comm_menu_key, "Title")},
 			{ "%%suffix", _suffix },
-			{ "%%pid", std::to_string(::Get_current_pid())} // from CommonToolsMisc.cpp
+			{ "%%pid", std::to_string(::Get_current_pid())}, 
+			{ "%%procname", Get_process_name()}
 		};
 
 		for (const auto& [key, value] : replacements) {
