@@ -473,6 +473,14 @@ namespace MessirLogger {
 		std::string Format_log_message(const LogRecord& record);
 
 		/**
+		 * Overridable method to give the inheriting target a chance to modify output format for any particular record.
+		 * 
+		 * @param format_string format string to be modified
+		 * @param record recored being rendered
+		 */
+		virtual void Modify_format_on_the_fly(std::string& format_string, const LogRecord& record);
+
+		/**
 		 * Custom formatting for time defined by _format_string.
 		 *
 		 * @param input_str unformatted input

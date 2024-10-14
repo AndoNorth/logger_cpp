@@ -25,6 +25,14 @@ namespace MessirLogger {
 		void Refresh() override;
 
 		/**
+		 * Overridable method to give the inheriting target a chance to modify output format for any particular record.
+		 *
+		 * @param format_string format string to be modified
+		 * @param record recored being rendered
+		 */
+		void Modify_format_on_the_fly(std::string& format_string, const LogRecord& record) override;
+
+		/**
 		 * Attempt to write the given log record.
 		 *
 		 * @param record log record to be written

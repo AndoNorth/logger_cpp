@@ -371,6 +371,10 @@ namespace MessirLogger {
 	std::string Target::Format_log_message(const LogRecord& record) {
 
 		std::string formatted_message(_format_string);
+
+		// Let inheriting target class modify formatting on the fly, for the given record
+		Modify_format_on_the_fly(formatted_message, record);
+
 		size_t pos;
 
 		const std::unordered_map<std::string, std::string> replacements {
@@ -399,6 +403,8 @@ namespace MessirLogger {
 
 		return formatted_message;
 	}
+
+	void Target::Modify_format_on_the_fly(std::string& format_string, const LogRecord& record) {}
 
 	std::string Target::Format_time(const std::string& input_str, const std::chrono::time_point<std::chrono::system_clock>& time) {
 
