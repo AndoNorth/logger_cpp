@@ -35,7 +35,7 @@
 	log_line(MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKindSet(kinds), MSS_MODULE_NAME, std::source_location::current(), entity, __logger)
 
 #define MSS_WARNING(kinds, entity) \
-	log_line(MessirLogger::LogLevel::LEVEL_INFO, MessirLogger::LogKindSet(kinds), MSS_MODULE_NAME, std::source_location::current(), entity, __logger)
+	log_line(MessirLogger::LogLevel::LEVEL_WARNING, MessirLogger::LogKindSet(kinds), MSS_MODULE_NAME, std::source_location::current(), entity, __logger)
 
 #define MSS_ERROR(kinds, entity) \
 	log_line(MessirLogger::LogLevel::LEVEL_ERROR, MessirLogger::LogKindSet(kinds), MSS_MODULE_NAME, std::source_location::current(), entity, __logger)
