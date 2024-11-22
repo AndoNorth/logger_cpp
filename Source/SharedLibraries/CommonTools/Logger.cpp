@@ -824,12 +824,23 @@ namespace MessirLogger {
 		try {
 			this->Get_config().Serialize(tmp_serializer);
 		} catch (const std::exception& e) {
-			std::cout << "[WARNING] Save_config could not serialize config, \"" << filename
-				<< "\", renamed to \"" << this->Backup_config(filename) << "\", saving default config" << std::endl;
+			std::cout << "[WARNING] Save_config could not serialize config with error: \"" << e.what() << "\". "
+				<< "Renaming \"" << filename << "\" to \"" << this->Backup_config(filename) << "\", "
+				<< "saving default config" << std::endl;
 			LoggerConfig tmp_config = Logger::Get_default_config();
 			tmp_config.Serialize(tmp_serializer);
 		}
-		std::string contents = tmp_serializer.m_json.dump();
+		std::string contents;
+		try {
+			 contents = tmp_serializer.m_json.dump();
+		}
+		catch (const nlohmann::json::exception& e) {
+			std::cout << "[WARNING] Save_config could not create JSON config with error: \"" << e.what() << "\". "
+				<< "Renaming \"" << filename << "\" to \"" << this->Backup_config(filename) << "\", "
+				<< "saving default config" << std::endl;
+			LoggerConfig tmp_config = Logger::Get_default_config();
+			tmp_config.Serialize(tmp_serializer);
+		}
 		std::ofstream file(filename);
 		if (!file.is_open()) {
 			// throw std::filesystem::filesystem_error("Failed to open file \"" + filename + "\"",
@@ -844,14 +855,16 @@ namespace MessirLogger {
 	void Logger::Load_config(std::string filename) {
 		
 		if (!std::filesystem::exists(filename)) {
-			std::cout << "[WARNING] Load_config \"" << filename << "\" was not found, configuring using default config" << std::endl;
+			std::cout << "[WARNING] Load_config \"" << filename << "\" was not found, configuring using default config" 
+				<< std::endl;
 			this->Configure(Logger::Get_default_config());
 			return;
 		}
 
 		std::ifstream file(filename);
 		if (!file.is_open()) {
-			std::cout << "[WARNING] Load_config could not open config file \"" << filename << "\", configuring using default config" << std::endl;
+			std::cout << "[WARNING] Load_config could not open config file \"" << filename 
+				<< "\", configuring using default config" << std::endl;
 			this->Configure(Logger::Get_default_config());
 			return;
 		}
@@ -873,8 +886,9 @@ namespace MessirLogger {
 			}
 			catch (const std::exception& e) {
 
-				std::cout << "[WARNING] Load_config could not deserialize config file \"" << filename
-					<< "\", renamed to \"" << this->Backup_config(filename) << "\", configuring using default config" << std::endl;
+				std::cout << "[WARNING] Load_config could not deserialize config file with error: \"" << e.what() << "\". "
+					<< "Renaming \"" << filename << "\" to \"" << this->Backup_config(filename) << "\", "
+					<< "configuring using default config" << std::endl;
 				this->Configure(Logger::Get_default_config());
 			}
 		} else {
