@@ -535,8 +535,8 @@ namespace MessirLogger {
 
 		if (_use_fallback && !_fallback_target) {
 			std::shared_ptr<TargetConfig> fallback_config =
-				std::make_shared<FileTargetConfig>("MessirComm", "", "", "FallbackLog",
-					0, 0);
+				std::make_shared<MessirLogger::TargetConfig>("MssFallbackStdOut", "",
+					MessirLogger::TargetType::SYSTEM_OUT_TARGET);
 			_fallback_target = New_log_target(fallback_config->_target_type);
 			_fallback_target->Configure(*fallback_config);
 			_fallback_target->Initialize();
@@ -645,6 +645,10 @@ namespace MessirLogger {
 			if (!res.success && _fallback_target) {
 
 				LogRecord fallback_record(record);
+				LogRecord log_write_failure_record(LEVEL_WARNING, KIND_TECHNICAL, MSS_MODULE_NAME, 
+					std::source_location::current(), "logger", res.reason, std::chrono::system_clock::now());
+				_fallback_target->Write_log(log_write_failure_record);
+
 				fallback_record.source_entity =
 					target->Get_target_name() + "," + fallback_record.source_entity;
 				_fallback_target->Write_log(fallback_record);

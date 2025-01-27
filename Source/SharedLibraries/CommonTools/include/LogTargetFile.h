@@ -149,7 +149,7 @@ namespace MessirLogger {
 		/**
 		 * Close file handle and re-open. Called when refreshing the target after failure.
 		 */
-		void Reopen_file();
+		[[nodiscard]] bool Reopen_file();
 
 	protected:
 		/**

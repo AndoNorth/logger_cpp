@@ -127,18 +127,15 @@ namespace MessirLogger {
 		_current_filename = formatted_filename;
 	}
 
-	void FileTarget::Reopen_file() {
+	bool FileTarget::Reopen_file() {
 
 		_file.close();
 
 		if (!_file.is_open()) {
 			_file.open(_current_filename, std::ios::out | std::ios::app);
-			if (!_file.is_open()) {
-				throw std::filesystem::filesystem_error("Failed to open file \"" + _current_filename + "\"",
-					std::make_error_code(std::errc::no_such_file_or_directory));
-				return;
-			}
 		}
+
+		return _file.is_open();
 	}
 
 	void FileTarget::Setup() {
@@ -171,7 +168,9 @@ namespace MessirLogger {
 		if (update_filename) {
 
 			this->Update_filename(std::chrono::system_clock::now());
-			this->Reopen_file();
+			if (!this->Reopen_file()) {
+				// TODO: We failed to reopen the target file. What should we do ?
+			}
 		}
 	}
 
@@ -203,20 +202,24 @@ namespace MessirLogger {
 	}
 
 	void FileTarget::Refresh() {
-		this->Reopen_file();
+		if (!this->Reopen_file()) {
+			// TODO: Failed to reopen target file. What should we do ?
+		}
 	}
 
 	TargetResult FileTarget::Try_write_log(const LogRecord& record) {
 
 		TargetResult result(true);
 
-		if (!_file.is_open()) {
-			this->Reopen_file();
+
+		result.success = _file.is_open();
+
+		if (!result.success) {
+			result.success = this->Reopen_file();
 		}
 
-		if (!_file.is_open()) {
-			result.success = false;
-			result.reason = "file could not be opened";
+		if (!result.success) {
+			result.reason = "Failed to open log file \"" + _current_filename + "\"";
 		}
 		else {
 			std::string formatted_message = this->Format_log_message(record);
