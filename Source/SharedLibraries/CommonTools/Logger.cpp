@@ -606,6 +606,15 @@ namespace MessirLogger {
 
 		std::unique_lock<std::recursive_mutex> logger_lock(_logger_mutex);
 
+#ifdef _WINDOWS
+		if (AttachConsole(ATTACH_PARENT_PROCESS)) {
+			FILE* pCout;
+			freopen_s(&pCout, "CONOUT$", "w", stdout);
+			std::cout.clear();
+			std::wcout.clear();
+		}
+#endif
+
 		this->Initialize();
 		this->Start_logging_thread();
 		this->Start_maintainance_thread();
