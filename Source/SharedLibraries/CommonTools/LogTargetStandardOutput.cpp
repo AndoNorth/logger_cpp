@@ -9,7 +9,7 @@ namespace MessirLogger {
 
 	void StandardOutputTarget::Setup() {}
 	void StandardOutputTarget::Maintenance() {}
-	void StandardOutputTarget::Refresh() {}
+	bool StandardOutputTarget::Refresh() { return true; }
 
 	void StandardOutputTarget::Modify_format_on_the_fly(std::string& format_string, const LogRecord& record) {
 		// For readability, we introduce ANSI color codes around the log level.

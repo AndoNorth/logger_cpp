@@ -508,8 +508,15 @@ namespace MessirLogger {
 		TargetResult res = this->Try_write_log(record);
 
 		if (!res.success) {
-			this->Refresh();
-			res = this->Try_write_log(record);
+
+			res.success = Refresh();
+
+			if (!res.success) {
+				res.reason = std::string("Failed to refresh log target for \"") + this->Get_target_name() + "\"";
+			}
+			else {
+				res = this->Try_write_log(record);
+			}
 		}
 
 		return res;

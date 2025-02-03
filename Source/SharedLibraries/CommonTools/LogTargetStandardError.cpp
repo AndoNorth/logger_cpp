@@ -8,7 +8,7 @@ namespace MessirLogger {
 
 	void StandardErrorTarget::Setup() {}
 	void StandardErrorTarget::Maintenance() {}
-	void StandardErrorTarget::Refresh() {}
+	bool StandardErrorTarget::Refresh() { return true; }
 
 	TargetResult StandardErrorTarget::Try_write_log(const LogRecord& record) {
 

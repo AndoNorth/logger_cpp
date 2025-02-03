@@ -22,7 +22,7 @@ namespace MessirLogger {
 		/**
 		 * Refresh the target.
 		 */
-		void Refresh() override;
+		bool Refresh() override;
 
 		/**
 		 * Overridable method to give the inheriting target a chance to modify output format for any particular record.

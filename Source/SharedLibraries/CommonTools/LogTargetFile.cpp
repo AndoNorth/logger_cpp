@@ -168,8 +168,10 @@ namespace MessirLogger {
 		if (update_filename) {
 
 			this->Update_filename(std::chrono::system_clock::now());
+
 			if (!this->Reopen_file()) {
-				// TODO: We failed to reopen the target file. What should we do ?
+				MSS_WARNING(MessirLogger::LogKind::KIND_TECHNICAL, "logger")
+					<< "Unable to reopen file " << _current_filename;
 			}
 		}
 	}
@@ -201,10 +203,8 @@ namespace MessirLogger {
 		return config;
 	}
 
-	void FileTarget::Refresh() {
-		if (!this->Reopen_file()) {
-			// TODO: Failed to reopen target file. What should we do ?
-		}
+	bool FileTarget::Refresh() {
+		return this->Reopen_file();
 	}
 
 	TargetResult FileTarget::Try_write_log(const LogRecord& record) {

@@ -439,8 +439,10 @@ namespace MessirLogger {
 
 		/**
 		 * Method should be overriden, perform any cleanup and reenable the target.
+		 * 
+		 * @return true if target was successfully refreshed, false otherwise
 		 */
-		virtual void Refresh() = 0;
+		virtual bool Refresh() = 0;
 
 		/**
 		 * Method should be overriden, attempt to write the log to target.

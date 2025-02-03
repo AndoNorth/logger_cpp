@@ -246,9 +246,9 @@ protected:
 		_log_records.emplace_back(record);
 		return result;
 	}
-	void Setup() { }
-	void Maintenance() {	_maintenence_called = true; }
-	void Refresh() { }
+	void Setup() override { }
+	void Maintenance() override {	_maintenence_called = true; }
+	bool Refresh() override { return true; }
 
 public:
 	bool Contains_log_record(const MessirLogger::LogRecord& record) const {

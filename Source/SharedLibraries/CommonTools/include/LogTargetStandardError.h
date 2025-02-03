@@ -22,7 +22,7 @@ namespace MessirLogger {
 		/**
 		 * Refresh the target.
 		 */
-		void Refresh() override;
+		bool Refresh() override;
 
 		/**
 		 * Attempt to write the given log record.
