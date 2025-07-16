@@ -615,6 +615,11 @@ namespace MessirLogger {
 		void Initialize();
 
 		/**
+		* Initialize the logger on a fallback target. 
+		*/
+		void Initialize_fallback_target();
+
+		/**
 		 * Thread function for asynchronous writting log record to targets.
 		 * 
 		 * @param stop_token token used to signal termination to the thread
@@ -753,6 +758,7 @@ namespace MessirLogger {
 		 * @return backup_filename output file target
 		 */
 		std::string Backup_config(std::string filename);
+
 
 	};
 }

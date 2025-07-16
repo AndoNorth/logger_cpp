@@ -3,8 +3,13 @@
 
 #include <fstream>
 #include <tuple>
+#include <regex>
+#include <chrono>
+#include "ScheduleUtils.h"
 
 namespace MessirLogger {
+
+	const int LOG_ITERATIONS_UNTIL_PURGE_CHECK = 10;
 
 	/**
 	 * Represents the configuration of a file logging target.
@@ -33,6 +38,11 @@ namespace MessirLogger {
 		size_t _log_frequency = 24;
 
 		/**
+		* How long logs should be kept. 
+		*/
+		int _log_storage_duration = 0;
+
+		/**
 		 * Prefix of of filename.
 		 */
 		std::string _prefix;
@@ -56,7 +66,8 @@ namespace MessirLogger {
 			const size_t& _log_frequency = 24,
 			const std::string& prefix = "",
 			const std::string& suffix = "",
-			const std::string& filename_format = "");
+			const std::string& filename_format = "",
+			const int& log_storage_duration = 0);
 
 		nlohmann::json Get_schema() const;
 		virtual void Validate(JSONSerializer& serializer) override;
@@ -73,7 +84,8 @@ namespace MessirLogger {
 					member("log_frequency", &FileTargetConfig::_log_frequency, this),
 					member("prefix", &FileTargetConfig::_prefix, this),
 					member("suffix", &FileTargetConfig::_suffix, this),
-					member("filename_format", &FileTargetConfig::_filename_format, this)
+					member("filename_format", &FileTargetConfig::_filename_format, this),
+					member("log_storage_duration", &FileTargetConfig::_log_storage_duration, this)
 				)
 			);
 		}
@@ -105,6 +117,10 @@ namespace MessirLogger {
 
 		/**
 		 * Frequency the log file rotation. Used as a modulo on hour.
+		 * Thus one should use values which can evenly divide 24 into
+		 * an integer, such as 24, 12, 8, 6, 3, 2 and 1. Anything else
+		 * might lead to inconsistent results which reset at midnight 
+		 * each day.
 		 */
 		size_t _log_frequency = 24;
 
@@ -129,14 +145,30 @@ namespace MessirLogger {
 		std::string _current_filename;
 
 		/**
-		 * Current hour retained by the log frequency.
+		 * The last time the filename was updated. 
 		 */
-		size_t _current_hour;
+		std::chrono::system_clock::time_point _last_filename_update;
+
+		/**
+		* How long to keep log files before deleting them in days.
+		*/
+		int _log_storage_duration;
 
 		/**
 		 * Log file handle.
 		 */
 		std::ofstream _file;
+
+		/**
+		* Compiled regex pattern which matches log files created previously. Based on
+		* the specified format in _filename_format.
+		*/
+		std::regex _current_log_regex;
+
+		/**
+		* Purges log files at start of process and at midnight each night if still running.
+		*/
+		std::unique_ptr<ScheduledCaller> _log_auto_cleanup_worker;
 
 	private:
 		/**
@@ -150,6 +182,12 @@ namespace MessirLogger {
 		 * Close file handle and re-open. Called when refreshing the target after failure.
 		 */
 		[[nodiscard]] bool Reopen_file();
+
+		/**
+		* Takes the format specified for log files stored as _filename_format
+		* and gets an equivalent regex pattern so we can find these log files later.
+		*/
+		std::string Get_regex_pattern_for_log_files();
 
 	protected:
 		/**

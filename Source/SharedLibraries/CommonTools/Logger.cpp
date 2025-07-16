@@ -541,17 +541,38 @@ namespace MessirLogger {
 	void Logger::Initialize() {
 
 		if (_use_fallback && !_fallback_target) {
-			std::shared_ptr<TargetConfig> fallback_config =
-				std::make_shared<MessirLogger::TargetConfig>("MssFallbackStdOut", "",
-					MessirLogger::TargetType::SYSTEM_OUT_TARGET);
-			_fallback_target = New_log_target(fallback_config->_target_type);
-			_fallback_target->Configure(*fallback_config);
-			_fallback_target->Initialize();
+			Initialize_fallback_target();
 		}
 
 		for (const std::shared_ptr<Target>& target : _targets) {
-			target->Initialize();
+			try {
+				target->Initialize();
+			}
+			catch (const std::exception& e) {
+				std::cerr << "[ERROR] Logger failed to initialize target \"" << target->Get_target_name() 
+					<< "\" with error: " << e.what() << std::endl;
+				if (_fallback_target) {
+					_use_fallback = true;
+					LogRecord log_init_failure_record(LEVEL_ERROR, KIND_TECHNICAL, MSS_MODULE_NAME,
+						std::source_location::current(), "logger", e.what(), std::chrono::system_clock::now());
+					_fallback_target->Write_log(log_init_failure_record);
+				}
+				else {
+					Initialize_fallback_target();
+				}
+			}
 		}
+	}
+
+	void Logger::Initialize_fallback_target()
+	{
+		_use_fallback = true;
+		std::shared_ptr<TargetConfig> fallback_config =
+			std::make_shared<MessirLogger::TargetConfig>("MssFallbackStdOut", "",
+				MessirLogger::TargetType::SYSTEM_OUT_TARGET);
+		_fallback_target = New_log_target(fallback_config->_target_type);
+		_fallback_target->Configure(*fallback_config);
+		_fallback_target->Initialize();
 	}
 
 	void Logger::Logging_thread(std::stop_token stop_token) {
@@ -584,10 +605,12 @@ namespace MessirLogger {
 	void Logger::Maintenance_thread(std::stop_token stop_token) {
 
 		while (!stop_token.stop_requested()) {
-
-			// Call maintenance method for each target. May trigger log rotation or refresh the target in case of failure
-			for (const std::shared_ptr<Target>& target : _targets) {
-				target->Perform_maintenance();
+			if (!_use_fallback) {
+				// Call maintenance method for each target. May trigger log rotation 
+				// or refresh the target in case of failure
+				for (const std::shared_ptr<Target>& target : _targets) {
+					target->Perform_maintenance();
+				}
 			}
 			
 			std::this_thread::sleep_for(std::chrono::seconds(10));
@@ -928,6 +951,7 @@ namespace MessirLogger {
 		std::filesystem::rename(filename, backup_filename);
 		return backup_filename;
 	}
+
 } // namespace MessirLogger
 
 log_line::~log_line() {
