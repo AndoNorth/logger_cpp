@@ -895,6 +895,9 @@ namespace MessirLogger {
 		}
 		file << contents;
 		file.close();
+
+		MSS_INFO(MessirLogger::LogKind::KIND_TECHNICAL, "logger")
+			<< "Logger configuration saved to " << filename;
 	}
 
 	void Logger::Load_config(std::string filename) {
@@ -903,6 +906,8 @@ namespace MessirLogger {
 			std::cout << "[WARNING] Load_config \"" << filename << "\" was not found, configuring using default config" 
 				<< std::endl;
 			this->Configure(Logger::Get_default_config());
+			// Save the default config
+			__logger.Save_config(filename);
 			return;
 		}
 
