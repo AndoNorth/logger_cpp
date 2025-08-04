@@ -833,6 +833,8 @@ namespace MessirLogger {
 		// restart with new configuration
 		this->Configure(config);
 		this->Start();
+		MSS_INFO(MessirLogger::LogKind::KIND_TECHNICAL, "logger")
+			<< "Logger configuration updated and reloaded";
 	}
 
 	void Logger::Log_entry(LogRecord record)
