@@ -181,7 +181,7 @@ namespace MessirLogger {
 			_log_auto_cleanup_worker->Call_immediately();
 		} else {
 			MSS_INFO(MessirLogger::LogKind::KIND_TECHNICAL, "logger")
-				<< "Log auto cleanup is disabled. Enable by setting _log_storage_duration to a non-zero value for "
+				<< "Log auto cleanup is disabled. Enable by setting log_storage_duration to a non-zero value for "
 				<< "FileTargetConfig in the configuration file";
 		}
 	}
