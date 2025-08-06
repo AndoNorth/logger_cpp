@@ -142,6 +142,8 @@ namespace MessirLogger {
 		_current_log_regex = std::regex(Get_regex_pattern_for_log_files());
 
 		_current_filename = formatted_filename;
+
+		_last_filename_update = time;
 	}
 
 	bool FileTarget::Reopen_file() {
@@ -209,7 +211,6 @@ namespace MessirLogger {
 			if ((now.tm_hour % _log_frequency) == 0 &&
 				minutes_since_update.count() >= 60) {
 				update_filename = true;
-				_last_filename_update = now_time;
 			}
 		}
 
