@@ -40,7 +40,7 @@ namespace MessirLogger {
 		/**
 		* How long logs should be kept. 
 		*/
-		int _log_storage_duration = 0;
+		int _log_storage_duration = 30;
 
 		/**
 		 * Prefix of of filename.
@@ -67,7 +67,7 @@ namespace MessirLogger {
 			const std::string& prefix = "",
 			const std::string& suffix = "",
 			const std::string& filename_format = "",
-			const int& log_storage_duration = 0);
+			const int& log_storage_duration = 30);
 
 		nlohmann::json Get_schema() const;
 		virtual void Validate(JSONSerializer& serializer) override;
