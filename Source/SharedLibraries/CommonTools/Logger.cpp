@@ -830,6 +830,9 @@ namespace MessirLogger {
 		// clear the configuration
 		_targets.clear();
 		_dispatch_keys.clear();
+		if (!config._use_fallback) {
+			_fallback_target.reset();
+		}
 		// restart with new configuration
 		this->Configure(config);
 		this->Start();

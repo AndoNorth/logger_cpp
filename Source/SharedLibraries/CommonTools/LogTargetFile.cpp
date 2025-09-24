@@ -143,7 +143,11 @@ namespace MessirLogger {
 
 		_current_filename = formatted_filename;
 
-		_last_filename_update = time;
+		// Update our interval to now, so it knows when to get the next one. 
+		// It's possible that we aren't updating regularly if _log_frequency is 0.
+		if (_filename_update_interval.has_value()) {
+			_filename_update_interval.value().Set_time_to_now();
+		}
 	}
 
 	bool FileTarget::Reopen_file() {
@@ -173,12 +177,14 @@ namespace MessirLogger {
 					<< "Purged " << files_purged << " log files. Automatic log file purge complete.";
 			};
 
+			_filename_update_interval = TimeInterval(std::chrono::hours(_log_frequency));
+
 			// A time interval to repeat every day. No offset is set, so this runs every day at midnight.
 			TimeInterval cleanup_interval(std::chrono::days(1));
 
 			// Initializes and starts a worker to clean up old log files. This runs immediately once
 			// created, as well as at midnight each day. 
-			_log_auto_cleanup_worker = std::make_unique<ScheduledCaller>(cleanup_func, cleanup_interval);
+			_log_auto_cleanup_worker = ScheduledCaller(cleanup_func, cleanup_interval);
 			_log_auto_cleanup_worker->Start();
 			_log_auto_cleanup_worker->Call_immediately();
 		} else {
@@ -189,27 +195,15 @@ namespace MessirLogger {
 	}
 
 	void FileTarget::Maintenance() {
-
 		bool update_filename = false;
 
-		// TODO@FIX: there may be a bug here since we use UTC time to check file lifetime
-		std::chrono::time_point now_time = std::chrono::system_clock::now();
-
-		// Using this function instead of gmtime because this function is run on an off-thread
-		// and gmtime is not thread safe when called on other threads across the application.
-		std::tm now = Gmtime_thread_safe(std::chrono::system_clock::to_time_t(now_time));
-
-		// Hours since update
-		auto diff = now_time - _last_filename_update;
-		std::chrono::minutes minutes_since_update = std::chrono::duration_cast<std::chrono::minutes>(diff);
-
 		if (_log_frequency != 0) {
-			// Checks if the hour is divisible by the given 
-			// _log_frequency, and that we haven't just updated
-			// the filename within the last hour.
+			// TODO@FIX: there may be a bug here since we use UTC time to check file lifetime
+			std::chrono::time_point now_time = std::chrono::system_clock::now();
+			std::chrono::time_point next_update = _filename_update_interval->Get_next_timestamp();
 
-			if ((now.tm_hour % _log_frequency) == 0 &&
-				minutes_since_update.count() >= 60) {
+			// If we have passed the time to update, then update!
+			if (now_time > next_update) {
 				update_filename = true;
 			}
 		}
@@ -392,9 +386,8 @@ namespace MessirLogger {
 		if (_file.is_open()) {
 			_file.close();
 		}
-		if (_log_auto_cleanup_worker != nullptr) {
-			_log_auto_cleanup_worker->Stop();
-			_log_auto_cleanup_worker = nullptr;
+		if (!_log_auto_cleanup_worker.has_value()) {
+			_log_auto_cleanup_worker = std::nullopt;
 		}
 	}
 }

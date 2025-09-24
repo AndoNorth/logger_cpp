@@ -145,9 +145,9 @@ namespace MessirLogger {
 		std::string _current_filename;
 
 		/**
-		 * The last time the filename was updated. 
-		 */
-		std::chrono::system_clock::time_point _last_filename_update;
+		* Keeps track of when we should update the filename again. 
+		*/
+		std::optional<TimeInterval> _filename_update_interval;
 
 		/**
 		* How long to keep log files before deleting them in days.
@@ -168,7 +168,7 @@ namespace MessirLogger {
 		/**
 		* Purges log files at start of process and at midnight each night if still running.
 		*/
-		std::unique_ptr<ScheduledCaller> _log_auto_cleanup_worker;
+		std::optional<ScheduledCaller> _log_auto_cleanup_worker;
 
 	private:
 		/**
