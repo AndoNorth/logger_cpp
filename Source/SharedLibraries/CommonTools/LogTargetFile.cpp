@@ -162,8 +162,14 @@ namespace MessirLogger {
 	}
 
 	void FileTarget::Setup() {
-		this->Update_filename(std::chrono::system_clock::now());
+		this->Update_filename(std::chrono::system_clock::now());	
+		_file.open(_current_filename, std::ios::out | std::ios::app);
 
+		if (!_file.is_open()) {
+			MSS_WARNING(MessirLogger::LogKind::KIND_TECHNICAL, "logger")
+				<< "Unable to open file " << _current_filename;
+		}
+	
 		if (_log_storage_duration != 0) {
 			// Function to regularly remove files older than _log_storage_duration days. 
 			std::function<void()> cleanup_func = [this]() {
@@ -208,7 +214,7 @@ namespace MessirLogger {
 			}
 		}
 
-		if (_max_filesize != 0) {
+		if (_max_filesize != 0 && std::filesystem::exists(_current_filename)) {
 			// TODO@CONSIDER: do we want to use MB conversion?
 			if (std::filesystem::file_size(_current_filename) > _max_filesize) {
 				update_filename = true;
