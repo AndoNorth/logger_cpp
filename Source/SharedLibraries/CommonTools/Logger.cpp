@@ -887,7 +887,7 @@ namespace MessirLogger {
 		}
 		std::string contents;
 		try {
-			 contents = tmp_serializer.m_json.dump();
+			 contents = tmp_serializer.m_json.dump(3);
 		}
 		catch (const nlohmann::json::exception& e) {
 			std::cout << "[WARNING] Save_config could not create JSON config with error: \"" << e.what() << "\". "
