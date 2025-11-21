@@ -425,7 +425,6 @@ namespace MessirLogger {
 		std::string _format_string =
 			"%%monstr %%day %%hour:%%min:%%sec.%%ms [%%source:%%line] [%%level:%%kinds] [%%module:%%entity] %%log";
 		TargetType _target_type;
-
 	protected:
 		/**
 		 * Method should be overridden, perform any setup required before enabling the target.
@@ -557,6 +556,21 @@ namespace MessirLogger {
 
 	private:
 		/**
+		* Represents a slot for a log target, and if we should perform maintenance.
+		*/
+		struct MaintainedLogTarget {
+			/**
+			* The log target.
+			*/
+			std::shared_ptr<Target> target;
+
+			/**
+			* Whether we should perform maintenance.
+			*/
+			bool should_perform_maintenance;
+		};
+
+		/**
 		 * Fallback logging target used when a target fails to write.
 		 */
 		std::shared_ptr<Target> _fallback_target;
@@ -593,9 +607,9 @@ namespace MessirLogger {
 		std::jthread _maintenance_thread;
 
 		/**
-		 * Log targets.
-		 */
-		std::vector<std::shared_ptr<Target>> _targets;
+		* Log targets and whether to maintain them or not. 
+		*/
+		std::vector<MaintainedLogTarget> _targets;
 
 		/**
 		 * Routing rules.

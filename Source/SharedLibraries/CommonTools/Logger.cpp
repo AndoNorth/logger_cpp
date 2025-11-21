@@ -544,12 +544,13 @@ namespace MessirLogger {
 			Initialize_fallback_target();
 		}
 
-		for (const std::shared_ptr<Target>& target : _targets) {
+		for (MaintainedLogTarget& slot : _targets) {
 			try {
-				target->Initialize();
+				slot.target->Initialize();
+				slot.should_perform_maintenance = true;
 			}
 			catch (const std::exception& e) {
-				std::cerr << "[ERROR] Logger failed to initialize target \"" << target->Get_target_name() 
+				std::cerr << "[ERROR] Logger failed to initialize target \"" << slot.target->Get_target_name() 
 					<< "\" with error: " << e.what() << std::endl;
 				if (_fallback_target) {
 					_use_fallback = true;
@@ -605,11 +606,11 @@ namespace MessirLogger {
 	void Logger::Maintenance_thread(std::stop_token stop_token) {
 
 		while (!stop_token.stop_requested()) {
-			if (!_use_fallback) {
-				// Call maintenance method for each target. May trigger log rotation 
-				// or refresh the target in case of failure
-				for (const std::shared_ptr<Target>& target : _targets) {
-					target->Perform_maintenance();
+			// Call maintenance method for each target. May trigger log rotation 
+			// or refresh the target in case of failure
+			for (const MaintainedLogTarget& slot : _targets) {
+				if (slot.should_perform_maintenance) {
+					slot.target->Perform_maintenance();
 				}
 			}
 			
@@ -747,8 +748,8 @@ namespace MessirLogger {
 		}
 
 		// target configs
-		for (const std::shared_ptr <Target>& target : _targets) {
-			config._target_configs.push_back(target->Get_config());
+		for (const MaintainedLogTarget& slot : _targets) {
+			config._target_configs.push_back(slot.target->Get_config());
 		}
 
 		return config;
@@ -766,7 +767,10 @@ namespace MessirLogger {
 			std::shared_ptr<Target> new_target = New_log_target(config->_target_type);
 			if (new_target) {
 				new_target->Configure(*config);
-				_targets.push_back(new_target);
+				_targets.push_back(MaintainedLogTarget{
+					.target = new_target,
+					.should_perform_maintenance = false,
+					});
 			}
 		}
 
@@ -785,10 +789,10 @@ namespace MessirLogger {
 			}
 
 			for (const std::string& target_name : dispatch_entry.targets) {
-				std::vector<std::shared_ptr<Target>>::iterator it_target =
+				std::vector<MaintainedLogTarget>::iterator it_target =
 					std::find_if(_targets.begin(), _targets.end(),
-						[&](const std::shared_ptr<Target>& target) {
-							return target->Get_target_name() == target_name;
+						[&](const MaintainedLogTarget& slot) {
+							return slot.target->Get_target_name() == target_name;
 						});
 
 				if (it_target == _targets.end()) {
@@ -799,7 +803,7 @@ namespace MessirLogger {
 					continue;
 				}
 
-				it_existing_key->targets.insert(*it_target);
+				it_existing_key->targets.insert((it_target->target));
 			}
 
 			if (it_existing_key->targets.empty()) {
@@ -812,14 +816,17 @@ namespace MessirLogger {
 
 		std::unique_lock<std::recursive_mutex> logger_lock(_logger_mutex);
 
-		std::vector<std::shared_ptr<Target>>::iterator it_target =
+		std::vector<MaintainedLogTarget>::iterator it_target =
 			std::find_if(_targets.begin(), _targets.end(),
-				[&](const std::shared_ptr<Target>& target) {
-					return target->Get_target_name() == new_target->Get_target_name();
+				[&](MaintainedLogTarget& slot) {
+					return slot.target->Get_target_name() == new_target->Get_target_name();
 				});
 
 		if (it_target == _targets.end()) {
-			_targets.push_back(new_target);
+			_targets.push_back(MaintainedLogTarget{
+				.target = new_target,
+				.should_perform_maintenance = false,
+				});
 		}
 	}
 
