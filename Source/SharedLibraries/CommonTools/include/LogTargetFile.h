@@ -30,7 +30,7 @@ namespace MessirLogger {
 		/**
 		 * Maximum size of log file.
 		 */
-		size_t _max_filesize = 0;
+		size_t _max_filesize_bytes = 0;
 
 		/**
 		 * Frequency of log rotation. This is used as a modulo on current hour.
@@ -62,7 +62,7 @@ namespace MessirLogger {
 			const std::string& format = "",
 			const std::string& filepath = "",
 			const std::string& filename = "",
-			const size_t& max_filesize = 0,
+			const size_t& max_filesize_bytes = 0,
 			const size_t& _log_frequency = 24,
 			const std::string& prefix = "",
 			const std::string& suffix = "",
@@ -80,7 +80,7 @@ namespace MessirLogger {
 				members(
 					member("filepath", &FileTargetConfig::_filepath, this),
 					member("filename", &FileTargetConfig::_filename, this),
-					member("max_filesize", &FileTargetConfig::_max_filesize, this),
+					member("max_filesize_bytes", &FileTargetConfig::_max_filesize_bytes, this),
 					member("log_frequency", &FileTargetConfig::_log_frequency, this),
 					member("prefix", &FileTargetConfig::_prefix, this),
 					member("suffix", &FileTargetConfig::_suffix, this),
@@ -113,7 +113,7 @@ namespace MessirLogger {
 		 * Max size of log file.
 		 * 0, means unlimited filesize.
 		 */
-		size_t _max_filesize = 0;
+		size_t _max_filesize_bytes = 0;
 
 		/**
 		 * Frequency the log file rotation. Used as a modulo on hour.

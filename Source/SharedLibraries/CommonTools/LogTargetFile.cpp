@@ -10,12 +10,17 @@
 
 namespace MessirLogger {
 
+	/**
+	 * Minimum acceptable file size for log rotation: 10MB in bytes.
+	 */
+	const size_t MIN_LOG_FILESIZE = 10 * 1024 * 1024;
+
 	// config
 	FileTargetConfig::FileTargetConfig(const std::string& name, const std::string& format, const std::string& filepath, 
-		const std::string& filename, const size_t& max_filesize, const size_t& log_period, const std::string& prefix,
+		const std::string& filename, const size_t& max_filesize_bytes, const size_t& log_period, const std::string& prefix,
 		const std::string& suffix, const std::string& filename_format, const int& log_storage_duration) 
 		: TargetConfig(name, format, TargetType::FILE_TARGET),
-		_filename(filename), _max_filesize(max_filesize), _log_frequency(log_period), _log_storage_duration(log_storage_duration)
+		_filename(filename), _max_filesize_bytes(max_filesize_bytes), _log_frequency(log_period), _log_storage_duration(log_storage_duration)
 	{
 		// Set only if value is provided, otherwise, leave the default values
 
@@ -57,14 +62,14 @@ namespace MessirLogger {
 			"properties": {
 				"filepath": { "type": "string" },
 				"filename": { "type": "string" },
-				"max_filesize": { "type": "number" },
+				"max_filesize_bytes": { "type": "number" },
 				"log_frequency": { "type": "number" },
 				"log_storage_duration": { "type": "number" },
 				"prefix": { "type": "string" },
 				"suffix": { "type": "string" },
 				"filename_format": { "type": "string" }
 			},
-			"required": ["filepath", "filename", "max_filesize", "log_frequency", "prefix", "suffix", "filename_format"]
+			"required": ["filepath", "filename", "max_filesize_bytes", "log_frequency", "prefix", "suffix", "filename_format"]
 		})"_json;
 
 		base_schema["properties"].update(derived_schema["properties"]);
@@ -162,6 +167,15 @@ namespace MessirLogger {
 	}
 
 	void FileTarget::Setup() {
+		// Validate that the max_filesize_bytes is within MIN_LOG_FILESIZE. If 0 we ignore.
+		// If it is too small, we set to the MIN_LOG_FILESIZE.
+		if (_max_filesize_bytes != 0 && _max_filesize_bytes < MIN_LOG_FILESIZE) {
+			MSS_WARNING(MessirLogger::LogKind::KIND_TECHNICAL, "logger")
+				<< "Configured max_filesize_bytes for logger " << _max_filesize_bytes << " bytes is less than minimum "
+				<< "acceptable size of " << MIN_LOG_FILESIZE << " bytes. Setting to minimum value.";
+			_max_filesize_bytes = MIN_LOG_FILESIZE;
+		}
+
 		this->Update_filename(std::chrono::system_clock::now());	
 		_file.open(_current_filename, std::ios::out | std::ios::app);
 
@@ -214,9 +228,9 @@ namespace MessirLogger {
 			}
 		}
 
-		if (_max_filesize != 0 && std::filesystem::exists(_current_filename)) {
+		if (_max_filesize_bytes != 0 && std::filesystem::exists(_current_filename)) {
 			// TODO@CONSIDER: do we want to use MB conversion?
-			if (std::filesystem::file_size(_current_filename) > _max_filesize) {
+			if (std::filesystem::file_size(_current_filename) > _max_filesize_bytes) {
 				update_filename = true;
 			}
 		}
@@ -237,7 +251,7 @@ namespace MessirLogger {
 		const FileTargetConfig& file_config = static_cast<const FileTargetConfig&>(config);
 		_filepath = file_config._filepath;
 		_filename = file_config._filename.empty() ? _filename : file_config._filename;
-		_max_filesize = file_config._max_filesize;
+		_max_filesize_bytes = file_config._max_filesize_bytes;
 		_log_frequency = file_config._log_frequency;
 		_prefix = file_config._prefix.empty() ? _prefix : file_config._prefix;
 		_suffix = file_config._suffix.empty() ? _suffix : file_config._suffix;
@@ -254,7 +268,7 @@ namespace MessirLogger {
 
 		std::shared_ptr<FileTargetConfig> config =
 			std::make_shared<FileTargetConfig>(base_config->_target_name, base_config->_format_string,
-				_filepath, _filename, _max_filesize, _log_frequency, _prefix, _suffix,
+				_filepath, _filename, _max_filesize_bytes, _log_frequency, _prefix, _suffix,
 				_filename_format, _log_storage_duration);
 		
 		return config;
