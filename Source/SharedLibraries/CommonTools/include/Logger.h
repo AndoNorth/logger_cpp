@@ -216,7 +216,7 @@ namespace MessirLogger {
 		/**
 		 * Time of emission of the log record.
 		 */
-		std::chrono::time_point<std::chrono::system_clock> timestamp;
+		std::chrono::time_point<std::chrono::system_clock> timestamp = std::chrono::system_clock::now();
 	};
 
 	COMMONTOOLS_EXPORT bool operator==(const LogRecord& lhs, const LogRecord& rhs);

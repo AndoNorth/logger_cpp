@@ -128,7 +128,7 @@ namespace MessirLogger {
 
 		if (!_current_filename.empty()) {
 			this->Write_log(LogRecord(MessirLogger::LogLevel::LEVEL_DEBUG, MessirLogger::LogKind::KIND_TECHNICAL, MSS_MODULE_NAME, std::source_location::current(), "",
-				"Transferring to new log file" + formatted_filename));
+				"Transferring to new log file " + formatted_filename));
 		}
 
 		// Ensure parent directory exists. Does nothing if it already exists, or if they specify something without a directory.
