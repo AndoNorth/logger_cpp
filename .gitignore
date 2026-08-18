@@ -1,0 +1,18 @@
+# Temp build folders
+/.build/
+/Build/
+/build/
+
+# VS files
+.vs/
+.vscode/
+*.ncb
+*.suo
+*.user
+*.sln.cache
+
+# Eclipse settings
+.settings/
+
+# other
+*.swp
