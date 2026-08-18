@@ -1,42 +1,48 @@
-cmake_minimum_required(VERSION 3.3)
+cmake_minimum_required(VERSION 3.14)
 
-list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/Build/cmake)
+project(logger_cpp LANGUAGES CXX)
 
-set(CMAKE_INSTALL_LIBDIR lib)
-set(CMAKE_INSTALL_BINDIR bin)
-set(CMAKE_INSTALL_INCLUDEDIR includes)
-
-set (MSS_DEPENDENCIES_DIR ${CMAKE_SOURCE_DIR}/../messir-mss-dependencies_install )
-cmake_path(NORMAL_PATH MSS_DEPENDENCIES_DIR OUTPUT_VARIABLE MSS_DEPENDENCIES_DIR)
-set (MSS_DEPENDENCIES_DIR ${MSS_DEPENDENCIES_DIR} CACHE PATH "Installation folder of mss-dependencies" FORCE)
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if (NOT WIN32)
-   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -static-libstdc++ -static-libgcc")
    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -static-libstdc++ -static-libgcc")
-endif (NOT WIN32)
+endif ()
 
-set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -D_DEBUG")
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -D_DEBUG")
+include(FetchContent)
 
-set(CMAKE_CONFIGURATION_TYPES "Debug;RelWithDebInfo" CACHE STRING "")
+FetchContent_Declare(
+   googletest
+   GIT_REPOSITORY https://github.com/google/googletest.git
+   GIT_TAG v1.15.2
+)
+set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(googletest)
 
-# Set this to "on" to have a verbose build
-set(CMAKE_VERBOSE_MAKEFILE off)
+FetchContent_Declare(
+   benchmark
+   GIT_REPOSITORY https://github.com/google/benchmark.git
+   GIT_TAG v1.9.1
+)
+set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
+set(BENCHMARK_ENABLE_GTEST_TESTS OFF CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(benchmark)
 
+FetchContent_Declare(
+   nlohmann_json
+   GIT_REPOSITORY https://github.com/nlohmann/json.git
+   GIT_TAG v3.11.3
+)
+FetchContent_MakeAvailable(nlohmann_json)
 
-MATH(EXPR stack_size "16 * 1024 * 1024") # 16 Mb
-set(MSS_STACK_SIZE ${stack_size} CACHE STRING "")
+set(JSON_VALIDATOR_INSTALL OFF CACHE BOOL "" FORCE)
+set(BUILD_TESTS OFF CACHE BOOL "" FORCE)
+FetchContent_Declare(
+   nlohmann_json_schema_validator
+   GIT_REPOSITORY https://github.com/pboettch/json-schema-validator.git
+   GIT_TAG 2.3.0
+)
+FetchContent_MakeAvailable(nlohmann_json_schema_validator)
 
-project(messir-mss)
-
-   add_subdirectory("Source")
-   add_subdirectory("Documentation")
-	add_subdirectory("Tests")
-
-
-if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-   set (CMAKE_INSTALL_PREFIX ${CMAKE_SOURCE_DIR}/../messir-mss_install)
-   cmake_path(NORMAL_PATH CMAKE_INSTALL_PREFIX OUTPUT_VARIABLE CMAKE_INSTALL_PREFIX)
-   set (CMAKE_INSTALL_PREFIX ${CMAKE_INSTALL_PREFIX} CACHE PATH "" FORCE)
-endif()
-   
+add_subdirectory("Source")
+add_subdirectory("Tests")

@@ -8,7 +8,6 @@
 
 #include <Logger.h>
 #include <LogTargetFile.h>
-#include <CommonToolsMisc.h>
 #include <nlohmann/json-schema.hpp>
 
 /**

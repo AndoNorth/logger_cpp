@@ -1,6 +1,6 @@
 #include "stdafx.h"
 
-#include <CommonToolsMisc.h>
+#include <ProcessName.h>
 #include <LogTargetFile.h>
 
 #include <filesystem>

@@ -18,7 +18,6 @@
 #endif
 
 #include <SerializerJSON.h>
-#include <RegistrySettings.h>
 #include <nlohmann/json-schema.hpp>
 
 /*

@@ -3,7 +3,6 @@
 #endif
 
 #include <benchmark/benchmark.h>
-#include <TestTools.h>
 
 #include <cmath>
 #include <filesystem>
