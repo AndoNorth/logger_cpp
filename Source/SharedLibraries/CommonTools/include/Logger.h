@@ -21,10 +21,30 @@
 #include <nlohmann/json-schema.hpp>
 
 /*
- * Macros for logging, example usage:
- * MSS_DEBUG(LOG_TECHNICAL, "surpervision") << "This is my log message";
- * MSS_INFO_EXTRA("special_def", LOG_TECHNICAL, "surpervision") << "This is my log message";
- * MSS_WARNING(LOG_TECHNICAL, "surpervision").Format("format_str, %s, %d, %ld", arg1, arg2, arg3);
+ * Logging entry points. Each expands to a `log_line` (see below) bound to
+ * the global `__logger` instance, which streams like an ostream and is
+ * flushed (dispatched to configured targets) when the temporary is destroyed
+ * at the end of the statement:
+ *
+ *   MSS_DEBUG(MessirLogger::LogKind::KIND_TECHNICAL, "supervision") << "This is my log message";
+ *   MSS_WARNING(MessirLogger::LogKind::KIND_TECHNICAL, "supervision").Format("format_str, %s, %d, %ld", arg1, arg2, arg3);
+ *
+ * Parameters, common to every macro below:
+ *   kinds  - a MessirLogger::LogKind, or several OR'd together, categorizing
+ *            *what* is being logged (KIND_TECHNICAL/KIND_ACTION/KIND_EVENT).
+ *            Independent from the severity level below - a dispatch rule can
+ *            route "WARNING + ACTION" logs differently from "WARNING + EVENT".
+ *   entity - a free-form string naming the sub-component/feature logging
+ *            the message (e.g. "file_target", "connection_pool"). Shows up
+ *            in the formatted output and is separate from MSS_MODULE_NAME
+ *            (the whole binary/library), which is captured automatically.
+ *
+ * One macro per MessirLogger::LogLevel, from least to most severe:
+ *   MSS_DEBUG, MSS_INFO, MSS_WARNING, MSS_ERROR, MSS_CRITICAL, MSS_FATAL
+ *
+ * MSS_MODULE_NAME must be #defined (as a string literal) by whatever target
+ * includes this header - see Source/SharedLibraries/CommonTools/CMakeLists.txt
+ * for how it's set via target_compile_definitions.
  */
 
 #define MSS_DEBUG(kinds, entity) \
@@ -45,6 +65,18 @@
 #define MSS_FATAL(kinds, entity) \
 	log_line(MessirLogger::LogLevel::LEVEL_FATAL, MessirLogger::LogKindSet(kinds), MSS_MODULE_NAME, std::source_location::current(), entity, __logger)
 
+/*
+ * _EXTRA variants: same as above, but gated behind `global_config.Active(extra_str)`
+ * - a runtime feature-flag check, letting a specific extra-verbose debug flag
+ * be toggled on in production without recompiling or dropping the log level
+ * globally. `extra_str` is the flag name to check.
+ *
+ * NOTE: `global_config` is an external hook from the logger's original
+ * codebase (a config object with an `Active(name)` method) that is NOT part
+ * of this standalone repo. These macros are kept for reference/history but
+ * will fail to link if actually invoked here - provide your own
+ * `global_config.Active(const std::string&)` if you need this behavior.
+ */
 #define MSS_DEBUG_EXTRA(extra_str, kinds, entity) \
 	if (global_config.Active(extra_str)) \
 		log_line(MessirLogger::LogLevel::LEVEL_DEBUG, MessirLogger::LogKindSet(kinds), MSS_MODULE_NAME, std::source_location::current(), entity, __logger)
